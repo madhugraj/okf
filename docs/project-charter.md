@@ -83,7 +83,7 @@ These measures prove coverage of observable discovery surfaces. They do not clai
 
 ## Open decisions
 
-1. Approve the formal OKF schema and validation rules.
+1. Approve the formal OKF schema and validation rules after the implemented typed-extraction contract.
 2. Confirm the production object-storage endpoint and retention policy; local development uses the implemented content-addressed filesystem store.
 3. Confirm the PostgreSQL deployment target for production metadata; local development uses SQLite.
 4. Confirm model providers and data-handling constraints for later stages.

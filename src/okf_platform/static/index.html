@@ -9,8 +9,8 @@
   <body>
     <header class="masthead">
       <div>
-        <p class="eyebrow">OPEN KNOWLEDGE FORMAT · STAGE 1</p>
-        <h1>Validate the corpus before knowledge extraction.</h1>
+        <p class="eyebrow">OPEN KNOWLEDGE FORMAT · CORPUS, OKF & RAG</p>
+        <h1>Validate the corpus, then compare traceable knowledge.</h1>
         <p class="lede">Discover and preserve every asset, test repeatability, challenge coverage with independent QA, and approve only when the evidence survives criticism.</p>
       </div>
       <div class="gate-pill"><span></span> Human approval required</div>
@@ -82,6 +82,7 @@
           <div class="section-heading"><div><p class="step">05 · APPROVE</p><h2>Human reconciliation gate</h2></div><span id="gate-state" class="status-pill locked">Locked</span></div>
           <div id="blockers" class="blockers"></div>
           <form id="approval-form">
+            <div id="exception-controls" class="exception-controls"></div>
             <label class="check"><input name="inventory_reviewed" type="checkbox" /> I reviewed the typed asset inventory, storage URI and provenance.</label>
             <label class="check"><input name="exceptions_reviewed" type="checkbox" /> I reviewed every failure, exclusion, invalid PDF and duplicate.</label>
             <label class="check"><input name="robots_reviewed" type="checkbox" /> I reviewed the robots snapshot and sitemap evidence.</label>
@@ -90,6 +91,47 @@
             <div class="approval-row"><label>Reviewer name<input id="reviewer" required placeholder="Your name" /></label><button id="approve-button" class="primary" disabled>Approve corpus</button></div>
           </form>
           <div id="approval-result" class="approval-result hidden"></div>
+        </section>
+
+        <section id="stage2-panel" class="panel hidden">
+          <div class="section-heading">
+            <div><p class="step">STAGE 2 · NORMALIZE</p><h2>Extract typed, source-linked text</h2></div>
+            <button id="stage2-button" class="primary" disabled>Run Stage 2 extraction</button>
+          </div>
+          <p class="help">Stage 2 reads only the frozen corpus snapshot. PDF pages, HTML, code, structured data and modern Office files are normalized with provenance. Binary types without an adapter remain visible as not extractable.</p>
+          <div id="stage2-result" class="convergence pending"><strong>Awaiting approved corpus</strong><span>No mutable crawl evidence is used.</span></div>
+        </section>
+
+        <section id="knowledge-panel" class="panel hidden">
+          <div class="section-heading">
+            <div><p class="step">STAGES 3–4 · BUILD</p><h2>Create OKF and Advanced RAG independently</h2></div>
+          </div>
+          <p class="help">Both agents read the same immutable Stage 2 extraction. OKF builds evidence-linked knowledge records; RAG builds a separate hybrid parent–child retrieval index. Neither reads the other's output.</p>
+          <div class="knowledge-build-grid">
+            <article>
+              <h3>OKF Builder Agent</h3>
+              <p>Documents, entities, concepts, atomic claims, relationships, temporal scope, conflicts and exact source evidence.</p>
+              <button id="okf-build-button" class="primary" disabled>Build OKF</button>
+              <div id="okf-build-result" class="build-result">Waiting for Stage 2.</div>
+            </article>
+            <article>
+              <h3>Advanced RAG Agent</h3>
+              <p>Hybrid sparse+dense retrieval, metadata filters, query decomposition, parent–child expansion, reranking and citation verification.</p>
+              <button id="rag-build-button" class="primary" disabled>Build RAG index</button>
+              <div id="rag-build-result" class="build-result">Waiting for Stage 2.</div>
+            </article>
+          </div>
+          <div class="query-workbench">
+            <label>Ask the approved corpus<textarea id="knowledge-question" placeholder="For example: What services does AISATS provide?"></textarea></label>
+            <div class="query-controls">
+              <label>Asset type filter<select id="knowledge-kind"><option value="">All text assets</option><option value="pdf">PDF</option><option value="html">HTML</option><option value="office">Office</option><option value="code">Code</option><option value="structured_data">Structured data</option></select></label>
+              <button id="compare-button" class="secondary" disabled>Compare OKF and RAG</button>
+            </div>
+          </div>
+          <div id="comparison-results" class="comparison-grid hidden">
+            <article><p class="step">OKF RESULT</p><div id="okf-answer"></div></article>
+            <article><p class="step">RAG RESULT</p><div id="rag-answer"></div></article>
+          </div>
         </section>
       </section>
     </main>

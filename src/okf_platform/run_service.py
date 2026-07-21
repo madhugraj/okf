@@ -17,11 +17,13 @@ from .convergence import compare_runs
 from .corpus import LocalCorpusStore
 from .crawler import CrawlEngine
 from .deep_scrape import BrowserDeepScraper
+from .governance import assess_qa_exceptions, decorate_findings
 from .models import CrawlReport, FetchResponse, TERMINAL_STATUSES, UrlStatus
 from .policy import CrawlPolicy, canonicalise_url
 from .robots import RobotsRules
 from .transport import HttpTransport
 from .qa import QaReport, build_qa_graph
+from .snapshot import freeze_corpus_snapshot
 from .workflow import build_discovery_graph
 
 
@@ -240,7 +242,13 @@ class RunService:
         runs = [self._decorate(json.loads(path.read_text(encoding="utf-8"))) for path in self.runs_dir.glob("*.json")]
         return sorted(runs, key=lambda item: str(item["created_at"]), reverse=True)
 
-    def approve(self, run_id: str, reviewer: str, checklist: dict[str, bool]) -> dict[str, object]:
+    def approve(
+        self,
+        run_id: str,
+        reviewer: str,
+        checklist: dict[str, bool],
+        qa_exceptions: list[dict[str, object]] | None = None,
+    ) -> dict[str, object]:
         if not reviewer.strip():
             raise ValueError("reviewer name is required")
         if not all(checklist.get(field) is True for field in self.checklist_fields):
@@ -250,7 +258,12 @@ class RunService:
             run = self._read_run(run_id)
             if run.get("approval"):
                 raise ValueError("this verification run already has an approved corpus manifest")
-            eligibility = self._eligibility(run)
+            exception_assessment = assess_qa_exceptions(
+                (run.get("qa") or {}).get("report"),
+                qa_exceptions or [],
+                reviewer=reviewer.strip(),
+            )
+            eligibility = self._eligibility(run, qa_exceptions or [])
             if not eligibility["eligible"]:
                 raise ValueError("approval gate is locked: " + "; ".join(eligibility["blockers"]))
             report = dict(run["report"])
@@ -267,9 +280,17 @@ class RunService:
                 "target_url": run["config"]["target_url"],
                 "report_sha256": report_hash,
                 "qa_verdict": run["qa"]["report"]["verdict"],
+                "qa_effective_verdict": (
+                    "accepted_with_exceptions"
+                    if exception_assessment["accepted"]
+                    else run["qa"]["report"]["verdict"]
+                ),
                 "qa_report": run["qa"]["report"],
+                "accepted_qa_exceptions": exception_assessment["accepted"],
                 "checklist": {field: True for field in self.checklist_fields},
             }
+            snapshot = freeze_corpus_snapshot(self.data_dir, approval, report)
+            approval["corpus_snapshot"] = snapshot
             _atomic_json(self.approvals_dir / f"{approval_id}.json", approval)
             run["approval"] = approval
             self._write_run(run)
@@ -339,8 +360,13 @@ class RunService:
             run["report"] = report.to_dict()
             self._write_run(run)
 
-    def _eligibility(self, run: dict[str, object]) -> dict[str, object]:
+    def _eligibility(
+        self,
+        run: dict[str, object],
+        qa_exceptions: list[dict[str, object]] | None = None,
+    ) -> dict[str, object]:
         blockers: list[str] = []
+        hard_blockers: list[str] = []
         report = run.get("report") or {}
         if run.get("status") != "completed":
             blockers.append("verification run is not complete")
@@ -354,14 +380,37 @@ class RunService:
         if not convergence.get("converged"):
             blockers.append("the two runs have not converged")
         qa = run.get("qa") or {}
+        waiver_assessment: dict[str, object] = {"accepted": [], "pending": [], "hard": []}
         if qa.get("status") != "completed":
-            blockers.append("adversarial QA is not complete")
-        elif (qa.get("report") or {}).get("verdict") != "pass":
-            blockers.append("adversarial QA found blocking coverage gaps")
-        return {"eligible": not blockers, "blockers": blockers}
+            message = "adversarial QA is not complete"
+            blockers.append(message)
+            hard_blockers.append(message)
+        else:
+            waiver_assessment = assess_qa_exceptions(
+                qa.get("report"), qa_exceptions or []
+            )
+            if waiver_assessment["hard"]:
+                message = "adversarial QA found non-bypassable integrity or tool failures"
+                blockers.append(message)
+                hard_blockers.append(message)
+            if waiver_assessment["pending"]:
+                blockers.append("adversarial QA found coverage gaps requiring explicit risk acceptance")
+        non_qa = [item for item in blockers if not item.startswith("adversarial QA")]
+        hard_blockers.extend(non_qa)
+        return {
+            "eligible": not blockers,
+            "eligible_with_exceptions": not hard_blockers and bool(waiver_assessment["pending"]),
+            "blockers": blockers,
+            "hard_blockers": list(dict.fromkeys(hard_blockers)),
+            "waiveable_findings": waiver_assessment["pending"],
+            "accepted_exceptions": waiver_assessment["accepted"],
+        }
 
     def _decorate(self, run: dict[str, object]) -> dict[str, object]:
         payload = json.loads(json.dumps(run))
+        qa = payload.get("qa") or {}
+        if qa.get("report"):
+            qa["report"]["findings"] = decorate_findings(qa["report"])
         report = payload.get("report") or {}
         urls = report.get("urls", {})
         statuses: dict[str, int] = {}

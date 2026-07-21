@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://okf.local/schemas/okf-1.0.schema.json",
+  "title": "Open Knowledge Format 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "okf_version",
+    "builder_version",
+    "corpus",
+    "documents",
+    "entities",
+    "concepts",
+    "claims",
+    "relationships",
+    "conflicts",
+    "extensions"
+  ],
+  "properties": {
+    "okf_version": {"const": "open-knowledge-format/1.0"},
+    "builder_version": {"type": "string"},
+    "corpus": {
+      "type": "object",
+      "required": ["id", "snapshot_sha256", "extraction_manifest_sha256", "target_url"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^corpus-"},
+        "snapshot_sha256": {"$ref": "#/$defs/sha256"},
+        "extraction_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "target_url": {"type": "string"},
+        "approved_at": {"type": "string"},
+        "approved_by": {"type": "string"}
+      }
+    },
+    "documents": {"type": "array", "items": {"$ref": "#/$defs/document"}},
+    "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
+    "concepts": {"type": "array", "items": {"$ref": "#/$defs/concept"}},
+    "claims": {"type": "array", "items": {"$ref": "#/$defs/claim"}},
+    "relationships": {"type": "array", "items": {"$ref": "#/$defs/relationship"}},
+    "conflicts": {"type": "array", "items": {"type": "object"}},
+    "extensions": {"type": "object"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "document": {
+      "type": "object",
+      "required": ["id", "object_sha256", "kind", "source_urls", "extraction_status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^doc-"},
+        "object_sha256": {"$ref": "#/$defs/sha256"},
+        "kind": {"type": "string"},
+        "source_urls": {"type": "array", "items": {"type": "string"}},
+        "extraction_status": {"type": "string"}
+      }
+    },
+    "entity": {
+      "type": "object",
+      "required": ["id", "canonical_name", "canonical_key", "type", "mentions", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ent-"},
+        "canonical_name": {"type": "string"},
+        "canonical_key": {"type": "string"},
+        "type": {"type": "string"},
+        "mentions": {"type": "array", "items": {"type": "object"}},
+        "status": {"type": "string"}
+      }
+    },
+    "concept": {
+      "type": "object",
+      "required": ["id", "label", "mention_count", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^concept-"},
+        "label": {"type": "string"},
+        "mention_count": {"type": "integer", "minimum": 1},
+        "status": {"type": "string"}
+      }
+    },
+    "claim": {
+      "type": "object",
+      "required": ["id", "statement", "predicate", "arguments", "evidence", "status", "validation"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^claim-"},
+        "statement": {"type": "string"},
+        "predicate": {"type": "string"},
+        "arguments": {"type": "object"},
+        "temporal_scope": {"type": ["object", "null"]},
+        "evidence": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/evidence"}},
+        "status": {"type": "string"},
+        "validation": {"const": "exact_evidence_verified"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["document_id", "object_sha256", "unit_id", "char_start", "char_end", "quote"],
+      "properties": {
+        "document_id": {"type": "string"},
+        "object_sha256": {"$ref": "#/$defs/sha256"},
+        "unit_id": {"type": "string"},
+        "char_start": {"type": "integer", "minimum": 0},
+        "char_end": {"type": "integer", "minimum": 1},
+        "quote": {"type": "string"},
+        "source_url": {"type": ["string", "null"]},
+        "locator": {"type": "object"}
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "required": ["id", "source_entity_id", "type", "target_entity_id", "supporting_claim_ids"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^rel-"},
+        "source_entity_id": {"type": "string"},
+        "type": {"type": "string"},
+        "target_entity_id": {"type": "string"},
+        "supporting_claim_ids": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

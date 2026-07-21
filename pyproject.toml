@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "okf-platform"
-version = "0.4.0"
+version = "0.7.0"
 description = "Auditable website document discovery and OKF/RAG evaluation platform"
 readme = "README.md"
 requires-python = ">=3.12"

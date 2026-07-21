@@ -41,6 +41,10 @@ M2 Increment 1 adds the local validation UI: crawl configuration, live progress,
 
 M2 Increment 2 separates repeat-run stability from adversarial QA, combines deterministic HTTP/sitemap discovery with Playwright-rendered discovery, and adds mandatory typed, content-addressed raw corpus storage. See [Discovery, adversarial QA and corpus storage](docs/crawler-qa-and-corpus-storage.md).
 
+Stage 2 Increment 1 adds audited human acceptance for bounded QA coverage gaps, freezes a hash-verified corpus snapshot, and creates deterministic typed extraction records with page/span provenance. See [Stage 2 plan](docs/stage-2-plan.md).
+
+M5–M7 now have an executable local baseline: a versioned OKF 1.0 bundle, an independent hybrid parent–child RAG index, side-by-side grounded querying, and a common evaluation API. Both pipelines consume the same immutable Stage 2 records. See [OKF and RAG implementation](docs/okf-rag-implementation.md).
+
 ## Run the validation UI
 
 Python 3.12 is required. From the repository root:
@@ -65,6 +69,8 @@ docs/
   stage-1-backlog.md
   stage-1-plan.md
   decisions/
+schemas/
+  okf-1.0.schema.json
 src/okf_platform/
   static/
 tests/
@@ -79,9 +85,9 @@ tests/
 | M2 Crawl UI | Live run, inventory and approval screens | User workflow accepted |
 | M3 Kolte Patil validation | Complex-site generalisation | Site adapter rules documented |
 | M4 Canonical corpus | Versioning, parsing, OCR and provenance | Corpus v1 approved |
-| M5 OKF | Structured knowledge and query path | OKF acceptance suite passes |
-| M6 Advanced RAG | Hybrid retrieval, reranking and citations | RAG acceptance suite passes |
-| M7 Evaluation | Reproducible OKF-versus-RAG comparison | Results reviewed |
+| M5 OKF | Structured knowledge and query path | Local baseline implemented; pilot acceptance pending |
+| M6 Advanced RAG | Hybrid retrieval, reranking and citations | Local baseline implemented; model adapter pending |
+| M7 Evaluation | Reproducible OKF-versus-RAG comparison | Common API implemented; gold set pending |
 | M8 Hardening | Security, scale and release readiness | Release criteria pass |
 
 ## Working agreements
