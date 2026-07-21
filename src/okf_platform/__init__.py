@@ -1,6 +1,3 @@
-"""OKF platform package.
+"""Auditable website-document discovery for the OKF project."""
 
-Implementation begins after the M0 foundation is approved.
-"""
-
-__version__ = "0.0.1"
+__version__ = "0.1.0"

@@ -33,7 +33,7 @@ flowchart TD
 
 ## Current status
 
-Milestone M0 defines the charter, target architecture, Stage 1 plan, backlog, decisions, and initial Python package structure. Crawler implementation begins only after this foundation is reviewed.
+Milestone M0 is approved. M1 is implementing the fixture-tested discovery core before the controlled AISATS pilot. The first increment covers URL policy, static discovery, bounded retrieval, PDF validation, exact duplicate evidence, terminal inventory, and a LangGraph reconciliation wrapper. See [the M1 scope and execution sequence](docs/m1-aisats-discovery.md).
 
 ## Repository map
 
