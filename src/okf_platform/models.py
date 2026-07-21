@@ -55,6 +55,16 @@ class FetchResponse:
 
 
 @dataclass(slots=True)
+class FetchAttempt:
+    """One transport attempt, retained even when a later retry succeeds."""
+
+    number: int
+    outcome: str
+    http_status: int | None = None
+    elapsed_ms: int | None = None
+
+
+@dataclass(slots=True)
 class UrlRecord:
     """Auditable terminal or transient state for one canonical URL."""
 
@@ -66,6 +76,7 @@ class UrlRecord:
     http_status: int | None = None
     reason: str | None = None
     content_type: str | None = None
+    attempts: list[FetchAttempt] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -92,6 +103,9 @@ class CrawlReport:
     documents: list[DocumentRecord] = field(default_factory=list)
     discovered_edges: list[tuple[str, str]] = field(default_factory=list)
     budget_exhausted: bool = False
+    robots_url: str | None = None
+    robots_sha256: str | None = None
+    robots_status: int | None = None
 
     @property
     def ready_for_reconciliation(self) -> bool:
@@ -105,3 +119,24 @@ class CrawlReport:
         }
         payload["ready_for_reconciliation"] = self.ready_for_reconciliation
         return payload
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> CrawlReport:
+        """Rehydrate a report written by :meth:`to_dict` for a resumable run."""
+
+        report = cls(
+            target_url=payload["target_url"],
+            documents=[DocumentRecord(**item) for item in payload.get("documents", [])],
+            discovered_edges=[tuple(item) for item in payload.get("discovered_edges", [])],
+            budget_exhausted=payload.get("budget_exhausted", False),
+            robots_url=payload.get("robots_url"),
+            robots_sha256=payload.get("robots_sha256"),
+            robots_status=payload.get("robots_status"),
+        )
+        for url, item in payload.get("urls", {}).items():
+            record = dict(item)
+            record.pop("url", None)
+            record["status"] = UrlStatus(record.get("status", UrlStatus.QUEUED))
+            record["attempts"] = [FetchAttempt(**attempt) for attempt in record.get("attempts", [])]
+            report.urls[url] = UrlRecord(url=url, **record)
+        return report

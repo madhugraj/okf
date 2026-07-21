@@ -34,15 +34,24 @@ These are observations, not hard-coded adapter rules.
 5. Repeat discovery to measure convergence.
 6. Publish the inventory and limitation register for human review.
 
-## Not yet complete
+The exact two-run procedure and reviewer gate are defined in the [AISATS pilot runbook](aisats-pilot-runbook.md).
 
-- robots parser and crawl-delay enforcement;
-- recursive sitemap fetching and reconciliation;
-- retry/backoff attempt history;
-- persistence/resume;
+## Increment 2 reliability controls
+
+The second increment adds:
+
+- a hashed robots.txt snapshot, allow/disallow enforcement, crawl-delay handling, and Sitemap directives;
+- bounded retries with exponential backoff and URL-level attempt history;
+- recursive sitemap-index traversal with the same domain and depth controls as HTML discovery;
+- atomic JSON checkpoints and resume of queued, interrupted, or unresolved URLs;
+- explicit comparison of successive runs for URL and document-hash convergence.
+
+Convergence is evidence that repeated bounded discovery is stable. It is not, by itself, proof that invisible or inaccessible content does not exist.
+
+## Still required before M1 exit
+
 - dynamic Playwright discovery;
 - archive/category coverage model;
-- convergence comparison across two runs;
 - UI and approval workflow.
 
 Those items remain required before M1 can satisfy its milestone exit gate.

@@ -35,6 +35,8 @@ flowchart TD
 
 Milestone M0 is approved. M1 is implementing the fixture-tested discovery core before the controlled AISATS pilot. The first increment covers URL policy, static discovery, bounded retrieval, PDF validation, exact duplicate evidence, terminal inventory, and a LangGraph reconciliation wrapper. See [the M1 scope and execution sequence](docs/m1-aisats-discovery.md).
 
+M1 Increment 2 adds robots enforcement, retry evidence, recursive sitemaps, atomic resume checkpoints, and two-run convergence measurement. The controlled live procedure is documented in the [AISATS pilot runbook](docs/aisats-pilot-runbook.md).
+
 ## Repository map
 
 ```text

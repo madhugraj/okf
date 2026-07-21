@@ -20,6 +20,8 @@ class CrawlPolicy:
     max_pages: int = 500
     max_download_bytes: int = 50 * 1024 * 1024
     max_redirects: int = 5
+    max_attempts: int = 3
+    retry_backoff_seconds: float = 0.25
     timeout_seconds: float = 20.0
     user_agent: str = "OKF-AuditableCrawler/0.1 (+https://github.com/madhugraj/okf)"
 
@@ -28,7 +30,13 @@ class CrawlPolicy:
         if not normalised:
             raise ValueError("at least one allowed host is required")
         object.__setattr__(self, "allowed_hosts", normalised)
-        if self.max_depth < 0 or self.max_pages < 1 or self.max_download_bytes < 1:
+        if (
+            self.max_depth < 0
+            or self.max_pages < 1
+            or self.max_download_bytes < 1
+            or self.max_attempts < 1
+            or self.retry_backoff_seconds < 0
+        ):
             raise ValueError("crawl budgets must be positive")
 
 
