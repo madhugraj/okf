@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import uvicorn
 
+from .knowledge_service import KnowledgeService
 from .run_service import QaRunner, RunConfig, RunService, Runner, execute_crawl, execute_qa
 from .stage2 import Stage2Service
 
@@ -41,13 +42,30 @@ class ApprovalRequest(BaseModel):
     qa_exceptions: list[QaExceptionRequest] = Field(default_factory=list)
 
 
+class KnowledgeQueryRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=2_000)
+    filters: dict[str, object] = Field(default_factory=dict)
+
+
+class EvaluationCaseRequest(BaseModel):
+    id: str | None = Field(default=None, max_length=120)
+    question: str = Field(min_length=3, max_length=2_000)
+    expected_terms: list[str] = Field(default_factory=list)
+    expected_source_urls: list[str] = Field(default_factory=list)
+    filters: dict[str, object] = Field(default_factory=dict)
+
+
+class EvaluationRequest(BaseModel):
+    cases: list[EvaluationCaseRequest] = Field(min_length=1, max_length=500)
+
+
 def create_app(
     *,
     data_dir: Path | None = None,
     runner: Runner = execute_crawl,
     qa_runner: QaRunner = execute_qa,
 ) -> FastAPI:
-    app = FastAPI(title="OKF Corpus and Knowledge Preparation", version="0.5.0")
+    app = FastAPI(title="OKF Corpus and Knowledge Preparation", version="0.7.0")
     static_dir = Path(__file__).with_name("static")
     store = RunService(
         data_dir or Path(os.getenv("OKF_DATA_DIR", ".okf-data")),
@@ -57,6 +75,8 @@ def create_app(
     app.state.run_service = store
     stage2 = Stage2Service(store.data_dir)
     app.state.stage2_service = stage2
+    knowledge = KnowledgeService(store.data_dir)
+    app.state.knowledge_service = knowledge
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     @app.get("/", include_in_schema=False)
@@ -140,6 +160,52 @@ def create_app(
     def start_stage2_extraction(corpus_id: str) -> dict[str, object]:
         try:
             return stage2.extract(corpus_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/corpora/{corpus_id}/okf/build")
+    def start_okf_build(corpus_id: str) -> dict[str, object]:
+        try:
+            return knowledge.build_okf(corpus_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/corpora/{corpus_id}/rag/build")
+    def start_rag_build(corpus_id: str) -> dict[str, object]:
+        try:
+            return knowledge.build_rag(corpus_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/corpora/{corpus_id}/compare")
+    def compare_knowledge(
+        corpus_id: str, request: Annotated[KnowledgeQueryRequest, Body()]
+    ) -> dict[str, object]:
+        try:
+            return knowledge.compare(
+                corpus_id,
+                request.question,
+                filters=request.filters,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/corpora/{corpus_id}/evaluate")
+    def evaluate_knowledge(
+        corpus_id: str, request: Annotated[EvaluationRequest, Body()]
+    ) -> dict[str, object]:
+        try:
+            return knowledge.evaluate(
+                corpus_id, [case.model_dump() for case in request.cases]
+            )
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
         except ValueError as exc:

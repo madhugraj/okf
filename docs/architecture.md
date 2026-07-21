@@ -80,8 +80,8 @@ stateDiagram-v2
 | Live events | Server-Sent Events first; WebSocket if bidirectional need emerges | Proposed |
 | Metadata | SQLite locally; PostgreSQL deployment adapter | Local implemented; production adapter pending |
 | Raw files/corpus | Content-addressed filesystem locally; S3/MinIO deployment adapter | Local implemented; production adapter pending |
-| Vector retrieval | Pluggable; Qdrant or pgvector candidate | Deferred to RAG ADR |
-| Evaluation | Deterministic metrics plus configurable research evaluators | Deferred |
+| Vector retrieval | Local deterministic feature-hash index; Qdrant/pgvector and learned-embedding adapters planned | Local baseline implemented |
+| Evaluation | Shared question set, expected-term/source metrics, citations, abstention and latency | Local API implemented |
 
 ## Core data model
 
@@ -96,6 +96,9 @@ stateDiagram-v2
 | CoverageEvidence | discovery surface, expected set, observed set, gaps, run |
 | CorpusSnapshot | immutable version, included documents, exclusions, approval record |
 | ApprovalDecision | reviewer, decision, timestamp, comments, evidence snapshot |
+| OKFBundle | documents, entities, concepts, atomic claims, relationships, conflicts and exact evidence spans |
+| RagChunk | parent/unit identity, child span, metadata, term statistics and immutable source locator |
+| EvaluationCase | question, optional expected terms/sources, filters and per-pipeline results |
 
 ## URL and document states
 
@@ -143,3 +146,5 @@ The UI may display a readiness status only when mandatory controls pass. A revie
 ## Later-stage isolation
 
 The approved corpus is a contract. OKF and RAG may generate independent derivatives, but neither may modify the frozen raw corpus. Comparative evaluation records corpus version, pipeline version, model/configuration version and evaluation-set version for every run.
+
+The implemented OKF Builder Agent and RAG Index Agent are separate LangGraph workflows. OKF cannot read the RAG index, and RAG cannot read OKF claims. Their only shared semantic input is the integrity-checked Stage 2 extraction manifest and records.

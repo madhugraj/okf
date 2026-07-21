@@ -2,7 +2,7 @@
 
 ## Status
 
-`PROPOSED` — the project name and intended outcome are confirmed; the exact machine-readable schema requires approval before M5 implementation.
+`IMPLEMENTED BASELINE` — OKF 1.0 is implemented as deterministic JSON with a published JSON Schema and runtime evidence validation. Domain and model-assisted extensions remain versioned future work.
 
 ## Working definition
 
@@ -29,7 +29,7 @@ An OKF design candidate must represent:
 
 ## Candidate shape
 
-The following is illustrative and must not be treated as the accepted schema:
+The following is a shortened illustration. The normative machine-readable contract is `schemas/okf-1.0.schema.json`.
 
 ```json
 {
@@ -52,16 +52,16 @@ The following is illustrative and must not be treated as the accepted schema:
 }
 ```
 
-## Decisions required before implementation
+## Implemented decisions
 
-1. JSON/JSON-LD, RDF or another serialisation strategy
-2. Ontology strategy: fixed core, domain extensions, or both
-3. Identifier and canonicalisation rules
-4. Claim granularity and n-ary relationship support
-5. Conflict and temporal version semantics
-6. Validation language and schema tooling
-7. Compatibility requirements with external knowledge tools
-8. Human review and amendment lifecycle
+1. Canonical JSON 1.0 is the portable baseline; JSON-LD/RDF exporters can be added without changing record identity.
+2. The format has a fixed evidence-first core plus an `extensions` object for versioned domains.
+3. Stable identifiers are SHA-256-derived from canonical source evidence and normalized values.
+4. Claims are atomic evidence sentences with typed arguments and zero or more entity references.
+5. Conflicting propositions coexist and are emitted as potential-conflict review records; history is not overwritten.
+6. JSON Schema documents structure; runtime validation additionally proves every quoted evidence span against Stage 2 text.
+7. External graph compatibility is an exporter concern rather than a core-storage dependency.
+8. Machine-extracted records remain visibly labelled; future human decisions must be append-only amendments.
 
 ## Acceptance criteria for the format
 

@@ -208,6 +208,46 @@ def _qa_gap_runner(config: RunConfig, report: CrawlReport) -> QaReport:
     )
 
 
+def test_ui_api_builds_and_compares_okf_and_rag(tmp_path) -> None:
+    with TestClient(create_app(data_dir=tmp_path, runner=_runner, qa_runner=_qa_runner)) as client:
+        first = client.post("/api/runs", json={"url": "https://example.com/"}).json()
+        _await_run(client, first["id"])
+        second = client.post(f"/api/runs/{first['id']}/verification").json()
+        _await_run(client, second["id"])
+        client.post(f"/api/runs/{second['id']}/qa")
+        _await_qa(client, second["id"])
+        approval = client.post(
+            f"/api/runs/{second['id']}/approval",
+            json={
+                "reviewer": "Madhu",
+                "inventory_reviewed": True,
+                "exceptions_reviewed": True,
+                "robots_reviewed": True,
+                "archive_coverage_reviewed": True,
+                "qa_findings_reviewed": True,
+            },
+        ).json()
+        corpus_id = approval["id"]
+
+        assert client.post(f"/api/corpora/{corpus_id}/stage2/extraction").status_code == 200
+        okf = client.post(f"/api/corpora/{corpus_id}/okf/build")
+        rag = client.post(f"/api/corpora/{corpus_id}/rag/build")
+        assert okf.status_code == 200
+        assert rag.status_code == 200
+        comparison = client.post(
+            f"/api/corpora/{corpus_id}/compare",
+            json={"question": "What services are available?"},
+        )
+        assert comparison.status_code == 200
+        assert comparison.json()["same_corpus"] is True
+        evaluation = client.post(
+            f"/api/corpora/{corpus_id}/evaluate",
+            json={"cases": [{"question": "What services are available?"}]},
+        )
+        assert evaluation.status_code == 200
+        assert evaluation.json()["summary"]["okf"]["case_count"] == 1
+
+
 def test_reviewer_can_accept_a_coverage_gap_with_audited_exception(tmp_path) -> None:
     with TestClient(create_app(data_dir=tmp_path, runner=_runner, qa_runner=_qa_gap_runner)) as client:
         first = client.post("/api/runs", json={"url": "https://example.com/"}).json()
