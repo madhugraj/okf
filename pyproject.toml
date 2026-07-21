@@ -9,7 +9,13 @@ description = "Auditable website document discovery and OKF/RAG evaluation platf
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "OKF Project Contributors" }]
-dependencies = []
+dependencies = [
+  "langgraph>=0.2,<2",
+  "pymupdf>=1.24,<2",
+]
+
+[project.scripts]
+okf-crawl = "okf_platform.cli:main"
 
 [project.optional-dependencies]
 dev = [

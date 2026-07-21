@@ -95,6 +95,7 @@ stateDiagram-v2
 
 Each discovered URL must reach exactly one terminal outcome:
 
+- `page_processed`
 - `downloaded_valid`
 - `downloaded_invalid`
 - `not_a_document`
