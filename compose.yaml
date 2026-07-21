@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: okf
+      POSTGRES_USER: okf
+      POSTGRES_PASSWORD: okf-local
+    ports:
+      - "5432:5432"
+    volumes:
+      - okf-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U okf -d okf"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  okf-postgres:

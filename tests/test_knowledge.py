@@ -8,7 +8,65 @@ from okf_platform.knowledge_service import KnowledgeService
 from okf_platform.models import FetchResponse
 from okf_platform.okf_core import OKF_VERSION, build_okf, load_okf_bundle, query_okf
 from okf_platform.rag import RAG_VERSION, build_rag_index, query_rag
+from okf_platform.rag_runtime import RagRuntime, RagRuntimeConfig
 from okf_platform.snapshot import canonical_hash
+from okf_platform.vector_store import DenseMatch
+
+
+class SemanticFixtureEncoder:
+    name = "semantic-fixture/1.0"
+    dimensions = 3
+    minimum_similarity = 0.8
+
+    def embed_documents(self, texts):
+        return [[1.0, 0.0, 0.0] for _ in texts]
+
+    def embed_query(self, text):
+        del text
+        return [1.0, 0.0, 0.0]
+
+
+class SemanticFixtureReranker:
+    name = "semantic-reranker-fixture/1.0"
+
+    def score(self, question, documents):
+        del question
+        return [1.0 for _ in documents]
+
+
+class MemoryVectorStore:
+    name = "memory-vector-store/1.0"
+
+    def __init__(self):
+        self.rows = {}
+
+    def replace(self, corpus_id, index_version, embedding_version, chunks, vectors):
+        key = (corpus_id, index_version, embedding_version)
+        self.rows[key] = {
+            str(chunk["id"]): list(vector)
+            for chunk, vector in zip(chunks, vectors, strict=True)
+        }
+
+    def search(
+        self,
+        corpus_id,
+        index_version,
+        embedding_version,
+        query_vector,
+        *,
+        filters,
+        limit,
+    ):
+        del filters
+        rows = self.rows[(corpus_id, index_version, embedding_version)]
+        matches = [
+            DenseMatch(chunk_id, sum(a * b for a, b in zip(vector, query_vector, strict=True)))
+            for chunk_id, vector in rows.items()
+        ]
+        return sorted(matches, key=lambda item: -item.score)[:limit]
+
+    def count(self, corpus_id, index_version, embedding_version):
+        return len(self.rows.get((corpus_id, index_version, embedding_version), {}))
 
 
 def _approved_corpus(tmp_path) -> tuple[str, str]:
@@ -137,3 +195,60 @@ def test_common_service_compares_and_evaluates_same_corpus(tmp_path) -> None:
         / corpus_id
         / f"{evaluation['evaluation_id']}.json"
     ).is_file()
+
+
+def test_semantic_dense_retrieval_answers_without_bm25_word_overlap(tmp_path) -> None:
+    corpus_id, url = _approved_corpus(tmp_path)
+    encoder = SemanticFixtureEncoder()
+    reranker = SemanticFixtureReranker()
+    store = MemoryVectorStore()
+    manifest = build_rag_index(
+        tmp_path, corpus_id, encoder=encoder, vector_store=store
+    )
+
+    answer = query_rag(
+        tmp_path,
+        corpus_id,
+        "Which apron assistance options exist?",
+        encoder=encoder,
+        reranker=reranker,
+        vector_store=store,
+    )
+
+    assert manifest["vector_backend"] == store.name
+    assert manifest["embedding_dimensions"] == 3
+    assert answer["status"] == "answered"
+    assert answer["citations"][0]["source_url"] == url
+    assert answer["trace"]["reranker_version"] == reranker.name
+
+
+def test_rag_service_exposes_runtime_and_ranking_metrics(tmp_path) -> None:
+    corpus_id, url = _approved_corpus(tmp_path)
+    config = RagRuntimeConfig(
+        sparse_candidates=40,
+        dense_candidates=40,
+        rerank_candidates=20,
+        final_passages=8,
+    )
+    runtime = RagRuntime(
+        config,
+        SemanticFixtureEncoder(),
+        SemanticFixtureReranker(),
+        MemoryVectorStore(),
+    )
+    service = KnowledgeService(tmp_path, runtime)
+    service.build_rag(corpus_id)
+    evaluation = service.evaluate(
+        corpus_id,
+        [
+            {
+                "question": "Which apron assistance options exist?",
+                "expected_source_urls": [url],
+            }
+        ],
+    )
+
+    assert service.rag_config()["retrieval"]["sparse"] == "BM25"
+    assert evaluation["summary"]["rag"]["average_recall_at_5"] == 1.0
+    assert evaluation["summary"]["rag"]["average_mrr"] == 1.0
+    assert evaluation["summary"]["rag"]["average_ndcg_at_10"] == 1.0

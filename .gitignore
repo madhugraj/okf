@@ -29,5 +29,8 @@ artifacts/
 .okf-data/
 uv.lock
 pip-metadata-*/
+pip-build-env-*/
+pip-build-tracker-*/
 pip-target-*/
 pip-unpack-*/
+tmp*.whl

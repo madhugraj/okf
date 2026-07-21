@@ -113,6 +113,9 @@ def _await_run(client: TestClient, run_id: str) -> dict[str, object]:
 def test_ui_serves_and_exposes_live_crawl_evidence(tmp_path) -> None:
     with TestClient(create_app(data_dir=tmp_path, runner=_runner, qa_runner=_qa_runner)) as client:
         assert client.get("/").status_code == 200
+        rag_config = client.get("/api/rag/config")
+        assert rag_config.status_code == 200
+        assert rag_config.json()["retrieval"]["sparse"] == "BM25"
         response = client.post("/api/runs", json={"url": "https://example.com/"})
         assert response.status_code == 202
         run = _await_run(client, response.json()["id"])

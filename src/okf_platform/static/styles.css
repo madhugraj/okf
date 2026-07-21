@@ -11,6 +11,11 @@ body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 Inter,
 main { width:min(1180px,92vw); margin:-44px auto 80px; }
 .panel { background:white; border:1px solid var(--line); border-radius:17px; padding:26px; box-shadow:0 13px 34px #1a33530d; }
 .setup-panel { position:relative; }
+.runtime-panel { margin-top:18px; }
+.runtime-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:18px; }
+.runtime-grid article { padding:13px 15px; border:1px solid var(--line); border-radius:10px; background:#f8fbff; }
+.runtime-grid span { display:block; color:var(--muted); font-size:11px; font-weight:750; text-transform:uppercase; letter-spacing:.04em; }
+.runtime-grid strong { display:block; margin-top:4px; overflow-wrap:anywhere; }
 .section-heading,.run-bar { display:flex; justify-content:space-between; align-items:center; gap:24px; }
 .section-heading h2,.run-bar h2 { margin:3px 0 0; font-size:22px; letter-spacing:-.02em; }
 .section-heading>p { max-width:480px; margin:0; color:var(--muted); }
@@ -91,5 +96,5 @@ td.url { max-width:420px; overflow-wrap:anywhere; }
 .citation { padding:9px; border-left:3px solid var(--cyan); background:#f1f8fa; color:#34455e; font-size:12px; overflow-wrap:anywhere; }
 #toast { position:fixed; right:24px; bottom:24px; max-width:420px; background:#15233c; color:white; padding:13px 17px; border-radius:10px; box-shadow:0 12px 32px #07142b40; transform:translateY(120px); transition:transform .25s; }
 #toast.show { transform:translateY(0); }
-@media (max-width:900px) { .masthead,.section-heading,.run-bar { align-items:flex-start; flex-direction:column; } .crawl-form { grid-template-columns:1fr 1fr; } .url-field { grid-column:1/-1; } .metrics { grid-template-columns:1fr 1fr; } .evidence-grid,.knowledge-build-grid,.comparison-grid { grid-template-columns:1fr; } }
+@media (max-width:900px) { .masthead,.section-heading,.run-bar { align-items:flex-start; flex-direction:column; } .crawl-form { grid-template-columns:1fr 1fr; } .url-field { grid-column:1/-1; } .metrics,.runtime-grid { grid-template-columns:1fr 1fr; } .evidence-grid,.knowledge-build-grid,.comparison-grid { grid-template-columns:1fr; } }
 @media (max-width:560px) { .masthead { padding:36px 22px 70px; } main { width:94vw; } .crawl-form,.metrics,.approval-row { grid-template-columns:1fr; } .panel { padding:19px; } .run-actions { flex-wrap:wrap; } }

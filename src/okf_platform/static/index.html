@@ -31,6 +31,16 @@
         </form>
       </section>
 
+      <section class="panel runtime-panel">
+        <div class="section-heading">
+          <div><p class="step">RETRIEVAL RUNTIME</p><h2>Hybrid RAG configuration</h2></div>
+          <span id="rag-runtime-pill" class="status-pill">Loading</span>
+        </div>
+        <div id="rag-runtime" class="runtime-grid">
+          <span>Reading the active embedding, vector database and reranker configuration…</span>
+        </div>
+      </section>
+
       <section id="workspace" class="workspace hidden">
         <div class="run-bar">
           <div><p class="step">LIVE RUN</p><h2 id="target-label">—</h2><p id="run-id" class="mono"></p></div>
@@ -116,7 +126,7 @@
             </article>
             <article>
               <h3>Advanced RAG Agent</h3>
-              <p>Hybrid sparse+dense retrieval, metadata filters, query decomposition, parent–child expansion, reranking and citation verification.</p>
+              <p>BM25 + learned dense retrieval, RRF, metadata filters, parent–child expansion, Qwen3 reranking and citation verification.</p>
               <button id="rag-build-button" class="primary" disabled>Build RAG index</button>
               <div id="rag-build-result" class="build-result">Waiting for Stage 2.</div>
             </article>

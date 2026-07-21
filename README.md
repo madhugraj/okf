@@ -43,7 +43,7 @@ M2 Increment 2 separates repeat-run stability from adversarial QA, combines dete
 
 Stage 2 Increment 1 adds audited human acceptance for bounded QA coverage gaps, freezes a hash-verified corpus snapshot, and creates deterministic typed extraction records with page/span provenance. See [Stage 2 plan](docs/stage-2-plan.md).
 
-M5–M7 now have an executable local baseline: a versioned OKF 1.0 bundle, an independent hybrid parent–child RAG index, side-by-side grounded querying, and a common evaluation API. Both pipelines consume the same immutable Stage 2 records. See [OKF and RAG implementation](docs/okf-rag-implementation.md).
+M5–M7 now have an executable baseline: a versioned OKF 1.0 bundle, an independent hybrid parent–child RAG index, side-by-side grounded querying, and a common evaluation API. The production RAG mode adds Qwen3 embeddings, PostgreSQL/pgvector HNSW search, BM25+dense RRF and Qwen3 reranking. Both pipelines consume the same immutable Stage 2 records. See [OKF and RAG implementation](docs/okf-rag-implementation.md) and [production hybrid RAG](docs/production-hybrid-rag.md).
 
 ## Run the validation UI
 
@@ -58,6 +58,10 @@ okf-ui
 ```
 
 Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Crawl evidence and approvals are stored under `.okf-data/` and intentionally excluded from Git. Do not approve a corpus merely because a run completed; use the UI's two-run and manual reconciliation gates.
+
+To enable learned semantic retrieval instead of the local deterministic baseline, start the
+included pgvector service and install the production RAG extras. Follow the
+[production hybrid RAG runbook](docs/production-hybrid-rag.md).
 
 ## Repository map
 
@@ -86,8 +90,8 @@ tests/
 | M3 Kolte Patil validation | Complex-site generalisation | Site adapter rules documented |
 | M4 Canonical corpus | Versioning, parsing, OCR and provenance | Corpus v1 approved |
 | M5 OKF | Structured knowledge and query path | Local baseline implemented; pilot acceptance pending |
-| M6 Advanced RAG | Hybrid retrieval, reranking and citations | Local baseline implemented; model adapter pending |
-| M7 Evaluation | Reproducible OKF-versus-RAG comparison | Common API implemented; gold set pending |
+| M6 Advanced RAG | Hybrid retrieval, reranking and citations | Qwen3 + pgvector implementation complete; pilot benchmark pending |
+| M7 Evaluation | Reproducible OKF-versus-RAG comparison | Ranking metrics implemented; reviewed gold set pending |
 | M8 Hardening | Security, scale and release readiness | Release criteria pass |
 
 ## Working agreements

@@ -80,7 +80,7 @@ stateDiagram-v2
 | Live events | Server-Sent Events first; WebSocket if bidirectional need emerges | Proposed |
 | Metadata | SQLite locally; PostgreSQL deployment adapter | Local implemented; production adapter pending |
 | Raw files/corpus | Content-addressed filesystem locally; S3/MinIO deployment adapter | Local implemented; production adapter pending |
-| Vector retrieval | Local deterministic feature-hash index; Qdrant/pgvector and learned-embedding adapters planned | Local baseline implemented |
+| Vector retrieval | PostgreSQL/pgvector HNSW cosine with 1,024D Qwen3 embeddings; deterministic local fallback | Implemented; pilot benchmark pending |
 | Evaluation | Shared question set, expected-term/source metrics, citations, abstention and latency | Local API implemented |
 
 ## Core data model

@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import math
 from pathlib import Path
 from time import perf_counter
 from typing import NotRequired, TypedDict
 
 from .knowledge_io import atomic_json, stable_id
 from .okf_core import audit_okf, build_okf, query_okf
+from .rag_runtime import RagRuntime, create_rag_runtime
 from .rag import audit_rag_index, build_rag_index, query_rag
 
 
@@ -19,6 +21,37 @@ class BuildState(TypedDict):
     corpus_id: str
     manifest: NotRequired[dict[str, object]]
     critic: NotRequired[dict[str, object]]
+
+
+def _ranking_metrics(
+    expected_sources: set[str], citations: list[dict[str, object]]
+) -> dict[str, float | None]:
+    if not expected_sources:
+        return {"recall_at_5": None, "recall_at_10": None, "mrr": None, "ndcg_at_10": None}
+    ranked_sources: list[str] = []
+    for citation in citations:
+        source = citation.get("source_url")
+        if source and str(source) not in ranked_sources:
+            ranked_sources.append(str(source))
+    relevant_ranks = [
+        rank
+        for rank, source in enumerate(ranked_sources, start=1)
+        if source in expected_sources
+    ]
+
+    def recall(cutoff: int) -> float:
+        found = {source for source in ranked_sources[:cutoff] if source in expected_sources}
+        return len(found) / len(expected_sources)
+
+    dcg = sum(1 / math.log2(rank + 1) for rank in relevant_ranks if rank <= 10)
+    ideal_hits = min(len(expected_sources), 10)
+    ideal = sum(1 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))
+    return {
+        "recall_at_5": recall(5),
+        "recall_at_10": recall(10),
+        "mrr": 1 / min(relevant_ranks) if relevant_ranks else 0.0,
+        "ndcg_at_10": dcg / ideal if ideal else 0.0,
+    }
 
 
 def build_okf_agent():
@@ -41,16 +74,32 @@ def build_okf_agent():
     return graph.compile()
 
 
-def build_rag_agent():
+def build_rag_agent(runtime: RagRuntime):
     """RAG-only graph; it receives extraction units, never OKF claims."""
 
     from langgraph.graph import END, START, StateGraph
 
     def chunk_index_and_validate(state: BuildState) -> BuildState:
-        return {**state, "manifest": build_rag_index(state["data_dir"], state["corpus_id"])}
+        return {
+            **state,
+            "manifest": build_rag_index(
+                state["data_dir"],
+                state["corpus_id"],
+                encoder=runtime.encoder,
+                vector_store=runtime.vector_store,
+            ),
+        }
 
     def critic(state: BuildState) -> BuildState:
-        return {**state, "critic": audit_rag_index(state["data_dir"], state["corpus_id"])}
+        return {
+            **state,
+            "critic": audit_rag_index(
+                state["data_dir"],
+                state["corpus_id"],
+                encoder=runtime.encoder,
+                vector_store=runtime.vector_store,
+            ),
+        }
 
     graph = StateGraph(BuildState)
     graph.add_node("build_hybrid_parent_child_index", chunk_index_and_validate)
@@ -64,6 +113,15 @@ def build_rag_agent():
 @dataclass(slots=True)
 class KnowledgeService:
     data_dir: Path
+    rag_runtime: RagRuntime | None = None
+
+    def __post_init__(self) -> None:
+        if self.rag_runtime is None:
+            self.rag_runtime = create_rag_runtime()
+
+    def rag_config(self) -> dict[str, object]:
+        assert self.rag_runtime is not None
+        return self.rag_runtime.config.public_dict()
 
     def build_okf(self, corpus_id: str) -> dict[str, object]:
         state = build_okf_agent().invoke(
@@ -72,7 +130,8 @@ class KnowledgeService:
         return {**state["manifest"], "critic": state["critic"]}
 
     def build_rag(self, corpus_id: str) -> dict[str, object]:
-        state = build_rag_agent().invoke(
+        assert self.rag_runtime is not None
+        state = build_rag_agent(self.rag_runtime).invoke(
             {"data_dir": self.data_dir, "corpus_id": corpus_id}
         )
         return {**state["manifest"], "critic": state["critic"]}
@@ -88,7 +147,21 @@ class KnowledgeService:
         okf_result = query_okf(self.data_dir, corpus_id, question)
         okf_ms = (perf_counter() - started) * 1_000
         started = perf_counter()
-        rag_result = query_rag(self.data_dir, corpus_id, question, filters=filters)
+        assert self.rag_runtime is not None
+        config = self.rag_runtime.config
+        rag_result = query_rag(
+            self.data_dir,
+            corpus_id,
+            question,
+            filters=filters,
+            limit=config.final_passages,
+            encoder=self.rag_runtime.encoder,
+            reranker=self.rag_runtime.reranker,
+            vector_store=self.rag_runtime.vector_store,
+            sparse_candidates=config.sparse_candidates,
+            dense_candidates=config.dense_candidates,
+            rerank_candidates=config.rerank_candidates,
+        )
         rag_ms = (perf_counter() - started) * 1_000
         okf_result["latency_ms"] = round(okf_ms, 3)
         rag_result["latency_ms"] = round(rag_ms, 3)
@@ -127,6 +200,7 @@ class KnowledgeService:
                     for item in result.get("citations", [])
                     if item.get("source_url")
                 }
+                ranking = _ranking_metrics(expected_sources, result.get("citations", []))
                 methods[method] = {
                     "answered": result["status"] == "answered",
                     "citation_count": len(result.get("citations", [])),
@@ -143,6 +217,7 @@ class KnowledgeService:
                         if expected_sources
                         else None
                     ),
+                    **ranking,
                     "latency_ms": result["latency_ms"],
                 }
             results.append(
@@ -171,6 +246,16 @@ class KnowledgeService:
                 for item in method_metrics
                 if item["expected_source_recall"] is not None
             ]
+            ranking_averages = {}
+            for metric in ("recall_at_5", "recall_at_10", "mrr", "ndcg_at_10"):
+                values = [
+                    float(item[metric])
+                    for item in method_metrics
+                    if item[metric] is not None
+                ]
+                ranking_averages[f"average_{metric}"] = (
+                    sum(values) / len(values) if values else None
+                )
             summary[method] = {
                 "case_count": len(results),
                 "answered_rate": sum(item["answered"] for item in method_metrics) / len(results),
@@ -185,6 +270,7 @@ class KnowledgeService:
                 "average_expected_source_recall": (
                     sum(source_scores) / len(source_scores) if source_scores else None
                 ),
+                **ranking_averages,
                 "average_latency_ms": round(
                     sum(float(item["latency_ms"]) for item in method_metrics) / len(results), 3
                 ),

@@ -18,6 +18,31 @@ async function api(path, options = {}) {
   return payload;
 }
 
+async function loadRagRuntime() {
+  try {
+    const config = await api("/api/rag/config");
+    const retrieval = config.retrieval || {};
+    const pill = $("#rag-runtime-pill");
+    pill.textContent = config.mode === "production"
+      ? (config.ready ? "Production hybrid" : "Setup required")
+      : "Local baseline";
+    pill.className = `status-pill ${config.ready ? "complete" : "locked"}`;
+    $("#rag-runtime").innerHTML = [
+      ["Vector database", config.vector_backend],
+      ["Embedding", `${config.embedding_model} · ${config.embedding_dimensions}D`],
+      ["Lexical + fusion", `${retrieval.sparse} + dense · RRF`],
+      ["Reranker", config.reranker_model],
+    ].map(([label,value])=>`<article><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></article>`).join("");
+    if ((config.missing_dependencies || []).length) {
+      $("#rag-runtime").insertAdjacentHTML("beforeend", `<article><span>Missing packages</span><strong>${escapeHtml(config.missing_dependencies.join(", "))}</strong></article>`);
+    }
+  } catch (error) {
+    $("#rag-runtime-pill").textContent = "Unavailable";
+    $("#rag-runtime-pill").className = "status-pill locked";
+    $("#rag-runtime").textContent = error.message;
+  }
+}
+
 $("#crawl-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("#start-button").disabled = true;
@@ -152,7 +177,7 @@ $("#okf-build-button").addEventListener("click", async () => {
 
 $("#rag-build-button").addEventListener("click", async () => {
   const button=$("#rag-build-button"); button.disabled=true; $("#rag-build-result").textContent="Building hybrid parent–child index…";
-  try { const result=await api(`/api/corpora/${activeCorpusId}/rag/build`, {method:"POST"}); ragReady=true; $("#rag-build-result").textContent=`Ready · critic ${result.critic.verdict} · ${result.chunk_count} child chunks · ${result.parent_count} parents · ${result.embedding_version}`; refreshCompareGate(); }
+  try { const result=await api(`/api/corpora/${activeCorpusId}/rag/build`, {method:"POST"}); ragReady=true; $("#rag-build-result").textContent=`Ready · critic ${result.critic.verdict} · ${result.chunk_count} child chunks · ${result.parent_count} parents · ${result.embedding_version} · ${result.embedding_dimensions}D · ${result.vector_backend}`; refreshCompareGate(); }
   catch(error) { $("#rag-build-result").textContent=`Failed: ${error.message}`; button.disabled=false; }
 });
 
@@ -174,3 +199,5 @@ $("#compare-button").addEventListener("click", async () => {
 });
 
 function escapeHtml(value) { const div=document.createElement("div"); div.textContent=String(value); return div.innerHTML; }
+
+loadRagRuntime();

@@ -18,17 +18,20 @@ The bundle contains documents, canonical entities, concepts, atomic claims, enti
 
 ## Advanced RAG Agent
 
-The RAG workflow creates `advanced-rag/1.0` under:
+The RAG workflow creates a model-versioned `advanced-rag/1.1` artifact under:
 
 ```text
-.okf-data/knowledge/<corpus-id>/advanced-rag-1.0/
-  chunks.jsonl
-  manifest.json
+.okf-data/knowledge/<corpus-id>/advanced-rag-1.1/
+  embedding-<model-hash>/
+    chunks.jsonl
+    manifest.json
 ```
 
-Retrieval combines BM25-style sparse ranking and deterministic dense feature hashing through reciprocal-rank fusion. It then applies query decomposition, metadata filtering, parent-level diversity, reranking, exact citation validation and an abstention rule.
+Retrieval combines BM25 sparse ranking and learned Qwen3 dense retrieval from pgvector through reciprocal-rank fusion. It then applies query decomposition, metadata filtering, parent-level diversity, Qwen3 cross-encoder reranking, exact citation validation and an abstention rule.
 
-The local feature hash and extractive answer generator are deliberately reproducible and provider-free. Both implement explicit adapter contracts. They are the functional baseline, not a claim of pretrained semantic or generative quality. A later approved provider can supply learned embeddings, reranking and answer generation while preserving the index and evidence contracts.
+The local feature hash remains a reproducible, provider-free validation mode. Production mode uses `Qwen/Qwen3-Embedding-0.6B` at 1,024 dimensions, PostgreSQL/pgvector HNSW cosine search and `Qwen/Qwen3-Reranker-0.6B`. The extractive answer generator remains deliberately grounded and provider-free; a later approved answer model can use the same retrieved evidence and citation contract.
+
+Each embedding model and dimension has its own artifact directory and database key. The critic verifies every child span against Stage 2 and checks that pgvector contains exactly one embedding row for every frozen chunk.
 
 ## UI and API
 
@@ -41,4 +44,4 @@ API routes:
 - `POST /api/corpora/{corpus_id}/compare`
 - `POST /api/corpora/{corpus_id}/evaluate`
 
-The evaluation API accepts questions plus optional expected terms, expected source URLs and RAG metadata filters. Research conclusions require a separately reviewed gold set.
+The evaluation API accepts questions plus optional expected terms, expected source URLs and RAG metadata filters. When expected sources are supplied it reports Recall@5, Recall@10, MRR and nDCG@10, alongside citation, answer, abstention and latency metrics. Research conclusions require a separately reviewed gold set.

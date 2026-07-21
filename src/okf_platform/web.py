@@ -65,7 +65,7 @@ def create_app(
     runner: Runner = execute_crawl,
     qa_runner: QaRunner = execute_qa,
 ) -> FastAPI:
-    app = FastAPI(title="OKF Corpus and Knowledge Preparation", version="0.7.0")
+    app = FastAPI(title="OKF Corpus and Knowledge Preparation", version="0.8.0")
     static_dir = Path(__file__).with_name("static")
     store = RunService(
         data_dir or Path(os.getenv("OKF_DATA_DIR", ".okf-data")),
@@ -86,6 +86,10 @@ def create_app(
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/rag/config")
+    def rag_config() -> dict[str, object]:
+        return knowledge.rag_config()
 
     @app.get("/api/runs")
     def list_runs() -> list[dict[str, object]]:
@@ -182,6 +186,8 @@ def create_app(
             raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.post("/api/corpora/{corpus_id}/compare")
     def compare_knowledge(
@@ -197,6 +203,8 @@ def create_app(
             raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.post("/api/corpora/{corpus_id}/evaluate")
     def evaluate_knowledge(
@@ -210,6 +218,8 @@ def create_app(
             raise HTTPException(status_code=404, detail="approved corpus snapshot not found") from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return app
 

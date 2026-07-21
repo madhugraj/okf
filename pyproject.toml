@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "okf-platform"
-version = "0.7.0"
+version = "0.8.0"
 description = "Auditable website document discovery and OKF/RAG evaluation platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -25,6 +25,18 @@ okf-ui = "okf_platform.web:main"
 dev = [
   "pytest>=8.0",
   "ruff>=0.5",
+]
+models = [
+  "sentence-transformers>=5.1,<6",
+]
+postgres = [
+  "pgvector>=0.4,<1",
+  "psycopg[binary]>=3.2,<4",
+]
+production-rag = [
+  "pgvector>=0.4,<1",
+  "psycopg[binary]>=3.2,<4",
+  "sentence-transformers>=5.1,<6",
 ]
 
 [tool.hatch.build.targets.wheel]
