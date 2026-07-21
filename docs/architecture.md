@@ -12,11 +12,13 @@ flowchart TD
     UI --> API[FastAPI control plane]
     API --> LG[LangGraph workflow]
     LG --> CW[Crawl workers]
+    LG --> QA[Read-only QA critic]
     CW --> W[Target website]
     CW --> DB[(Operational metadata)]
     CW --> OS[(Object storage)]
     LG --> CR[Coverage reconciler]
     CR --> UI
+    QA --> UI
     UI -->|Approve| CS[Versioned corpus]
     CS --> OKF[OKF pipeline]
     CS --> RAG[RAG pipeline]
@@ -35,10 +37,13 @@ stateDiagram-v2
     Crawl --> Download
     Download --> Validate
     Validate --> Deduplicate
-    Deduplicate --> Reconcile
+    Deduplicate --> Stability
+    Stability --> Reconcile
     Reconcile --> Recover: retryable gaps
     Recover --> Crawl
-    Reconcile --> AwaitApproval: stopping rule met
+    Reconcile --> AdversarialQA: stability passed
+    AdversarialQA --> Recover: blocking gap
+    AdversarialQA --> AwaitApproval: QA passed
     AwaitApproval --> Discover: rerun requested
     AwaitApproval --> CorpusFrozen: approved
     CorpusFrozen --> [*]
@@ -52,13 +57,14 @@ stateDiagram-v2
 | Policy | Resolve allowed hosts, robots directives, rates and exclusions | Cannot override policy |
 | Discovery | Seed from sitemap, navigation, internal archives and configured entry points | Emits normalised URLs only |
 | Crawler | Fetch static pages and extract links | Host/depth/budget enforced |
-| Browser | Render pages only when HTTP discovery is insufficient | Same policy boundary and resource budget |
-| Downloader | Retrieve qualifying documents and record response/provenance | Content-type and size rules enforced |
+| Browser | Independently render DOM and observe same-domain network assets | Same robots, host and resource policy boundary |
+| Downloader | Persist qualifying raw assets and record response/provenance | Content-type and size rules enforced |
 | Validator | Check signature, parseability, truncation indicators, size and hash | No semantic approval |
 | Deduplicator | Group exact and near duplicates | Never deletes source evidence |
 | Reconciler | Compare expected, discovered, processed and failed sets | Produces gaps, not guesses |
 | Recovery | Retry transient failures with bounded backoff | Cannot retry indefinitely |
 | Approval | Pause for reviewer decision | No automatic approval |
+| QA critic | Read-only browser-first challenge and severity verdict | Cannot write corpus, alter baseline or approve |
 
 ## Proposed technology baseline
 
@@ -66,14 +72,14 @@ stateDiagram-v2
 |---|---|---|
 | API | Python 3.12 + FastAPI | Proposed |
 | Workflow | LangGraph | Confirmed direction |
-| Static crawl | `httpx` and/or Scrapy with HTML parsing | Spike required |
-| Dynamic crawl | Playwright | Use only when required |
+| Static crawl | Bounded HTTP/sitemap crawler with deterministic HTML parsing | Implemented |
+| Dynamic crawl | Playwright rendered-DOM and network discovery | Implemented |
 | PDF validation/parsing | PyMuPDF and pdfplumber | Spike required |
 | OCR | Pluggable OCR adapter | Selection deferred |
 | Frontend | React/Next.js | Proposed |
 | Live events | Server-Sent Events first; WebSocket if bidirectional need emerges | Proposed |
-| Metadata | PostgreSQL | Proposed |
-| Raw files/corpus | S3-compatible object storage | Proposed |
+| Metadata | SQLite locally; PostgreSQL deployment adapter | Local implemented; production adapter pending |
+| Raw files/corpus | Content-addressed filesystem locally; S3/MinIO deployment adapter | Local implemented; production adapter pending |
 | Vector retrieval | Pluggable; Qdrant or pgvector candidate | Deferred to RAG ADR |
 | Evaluation | Deterministic metrics plus configurable research evaluators | Deferred |
 
@@ -84,7 +90,7 @@ stateDiagram-v2
 | CrawlRun | run ID, target, policy snapshot, status, timestamps, counters |
 | UrlRecord | canonical URL, referring URL, discovery method, depth, terminal status |
 | FetchAttempt | request metadata, response metadata, timing, retry class, error |
-| Document | document ID, source URL, MIME, bytes, SHA-256, storage key, validation |
+| Asset | asset type, source/final URL, MIME evidence, bytes, SHA-256, storage URI, tool and referrer |
 | DocumentVersion | logical document, content hash, retrieval time, predecessor |
 | DuplicateGroup | exact/near type, members, similarity evidence, retained canonical |
 | CoverageEvidence | discovery surface, expected set, observed set, gaps, run |
@@ -118,8 +124,9 @@ Completeness is an evidence bundle rather than a single percentage. It includes:
 3. archive/category/year/pagination traversal evidence;
 4. document-link versus download reconciliation;
 5. bounded retry and failure classification;
-6. repeated-run convergence with no new qualifying URLs;
-7. counts and exceptions by discovery surface.
+6. repeat-run convergence with no new qualifying URLs;
+7. a separate adversarial QA report from alternate discovery evidence; and
+8. counts and exceptions by discovery surface and asset type.
 
 The UI may display a readiness status only when mandatory controls pass. A reviewer must still approve the corpus.
 

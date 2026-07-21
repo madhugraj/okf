@@ -2,11 +2,14 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+pytest-of-root/
 .ruff_cache/
 .mypy_cache/
 .coverage
 htmlcov/
 .venv/
+.venv*/
+.test-deps/
 venv/
 .env
 .env.*
@@ -23,3 +26,8 @@ test-results/
 data/raw/
 data/corpora/
 artifacts/
+.okf-data/
+uv.lock
+pip-metadata-*/
+pip-target-*/
+pip-unpack-*/

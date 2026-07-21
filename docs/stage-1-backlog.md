@@ -15,8 +15,8 @@
 | S1-003 | P0 | Discover sitemap URLs | Sitemap indexes, canonical URLs and failures are recorded | S1-001 |
 | S1-004 | P0 | Crawl static internal links | Frontier is bounded, resumable and cycle-safe | S1-001, S1-002 |
 | S1-005 | P0 | Discover archive and pagination paths | Category/year/page traversal evidence is retained | S1-004 |
-| S1-006 | P1 | Render selected dynamic pages | Escalation rule is observable and resource bounded | S1-004 |
-| S1-007 | P0 | Download documents idempotently | Retries do not duplicate bytes or records | S1-002, S1-004 |
+| S1-006 | P0 | Run Playwright deep discovery | Rendered DOM and network assets are reconciled under the same policy | S1-004 |
+| S1-007 | P0 | Store typed raw assets idempotently | PDF/image/video/HTML/code/etc. are separated; retries do not duplicate bytes or provenance | S1-002, S1-004 |
 | S1-008 | P0 | Validate PDF integrity and metadata | Signature, size, parseability, pages and hash are recorded | S1-007 |
 | S1-009 | P0 | Detect exact duplicates | SHA-256 groups duplicates without losing provenance | S1-008 |
 | S1-010 | P1 | Flag near duplicates for review | Similarity evidence and threshold version are visible | S1-008 |
@@ -36,6 +36,8 @@
 | S1-024 | P0 | Run Kolte Patil pilot | Generalisation gaps and adapter decisions recorded | S1-023 |
 | S1-025 | P1 | Add operational observability | Structured logs, metrics and run correlation support diagnosis | S1-016 |
 | S1-026 | P2 | Compare corpus versions | Added, removed and changed documents are visible | S1-014 |
+| S1-027 | P0 | Run read-only adversarial QA | Alternate discovery gaps and failed QA tools block approval | S1-006, S1-013 |
+| S1-028 | P1 | Add S3/MinIO and PostgreSQL deployment adapters | Production storage preserves local corpus contracts and migration tests pass | S1-007, S1-014 |
 
 ## Recommended first sprint
 
