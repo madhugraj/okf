@@ -37,6 +37,21 @@ Milestone M0 is approved. M1 is implementing the fixture-tested discovery core b
 
 M1 Increment 2 adds robots enforcement, retry evidence, recursive sitemaps, atomic resume checkpoints, and two-run convergence measurement. The controlled live procedure is documented in the [AISATS pilot runbook](docs/aisats-pilot-runbook.md).
 
+M2 Increment 1 adds the local validation UI: crawl configuration, live progress, document and exception inspection, independent-run convergence, evidence download, and a persisted human corpus-approval manifest. See the [validation UI guide](docs/validation-ui.md).
+
+## Run the validation UI
+
+Python 3.12 is required. From the repository root:
+
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+okf-ui
+```
+
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). Crawl evidence and approvals are stored under `.okf-data/` and intentionally excluded from Git. Do not approve a corpus merely because a run completed; use the UI's two-run and manual reconciliation gates.
+
 ## Repository map
 
 ```text
@@ -48,6 +63,7 @@ docs/
   stage-1-plan.md
   decisions/
 src/okf_platform/
+  static/
 tests/
 ```
 

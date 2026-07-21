@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OKF Crawl Validation</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">OPEN KNOWLEDGE FORMAT · STAGE 1</p>
+        <h1>Validate the corpus before knowledge extraction.</h1>
+        <p class="lede">Discover PDFs, review every exception, verify a second run, and approve only when the evidence is stable.</p>
+      </div>
+      <div class="gate-pill"><span></span> Human approval required</div>
+    </header>
+
+    <main>
+      <section class="panel setup-panel">
+        <div class="section-heading">
+          <div><p class="step">01 · DISCOVER</p><h2>Start a controlled crawl</h2></div>
+          <p>Public, same-domain pages and PDFs only. Robots rules are enforced.</p>
+        </div>
+        <form id="crawl-form" class="crawl-form">
+          <label class="url-field">Website URL<input id="url" type="url" value="https://www.aisats.in/" required /></label>
+          <label>Page limit<input id="max-pages" type="number" value="500" min="1" /></label>
+          <label>Depth<input id="max-depth" type="number" value="8" min="0" /></label>
+          <label>Retries<input id="max-attempts" type="number" value="3" min="1" /></label>
+          <button id="start-button" class="primary" type="submit">Start crawl</button>
+        </form>
+      </section>
+
+      <section id="workspace" class="workspace hidden">
+        <div class="run-bar">
+          <div><p class="step">LIVE RUN</p><h2 id="target-label">—</h2><p id="run-id" class="mono"></p></div>
+          <div class="run-actions"><span id="status-pill" class="status-pill">Queued</span><a id="evidence-link" class="secondary" href="#">Download evidence</a></div>
+        </div>
+
+        <div class="metrics">
+          <article><span>URLs discovered</span><strong id="metric-urls">0</strong></article>
+          <article><span>Terminal outcomes</span><strong id="metric-terminal">0</strong></article>
+          <article><span>PDF records</span><strong id="metric-documents">0</strong></article>
+          <article class="warning"><span>Exceptions to review</span><strong id="metric-exceptions">0</strong></article>
+        </div>
+        <div class="progress-track"><div id="progress-bar"></div></div>
+
+        <div class="evidence-grid">
+          <section class="panel compact"><p class="step">ROBOTS EVIDENCE</p><dl><div><dt>URL</dt><dd id="robots-url">Waiting…</dd></div><div><dt>HTTP status</dt><dd id="robots-status">—</dd></div><div><dt>Snapshot SHA-256</dt><dd id="robots-hash" class="mono wrap">—</dd></div></dl></section>
+          <section class="panel compact"><p class="step">RUN CONTROL</p><dl><div><dt>Budget exhausted</dt><dd id="budget-state">No</dd></div><div><dt>Ready to reconcile</dt><dd id="reconcile-state">No</dd></div><div><dt>Failure</dt><dd id="error-state">None</dd></div></dl></section>
+        </div>
+
+        <section class="panel inventory-panel">
+          <div class="section-heading">
+            <div><p class="step">02 · INSPECT</p><h2>Evidence inventory</h2></div>
+            <div class="tabs"><button class="tab active" data-tab="documents">Documents</button><button class="tab" data-tab="exceptions">Exceptions</button><button class="tab" data-tab="urls">All URLs</button></div>
+          </div>
+          <div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
+          <p id="empty-table" class="empty">Evidence will appear as the crawler progresses.</p>
+        </section>
+
+        <section class="panel verification-panel">
+          <div class="section-heading">
+            <div><p class="step">03 · VERIFY</p><h2>Run independent discovery again</h2></div>
+            <button id="verify-button" class="secondary" disabled>Run verification crawl</button>
+          </div>
+          <p class="help">A second crawl must produce no new URLs, missing URLs, or document hashes. Stability supports review; it does not prove invisible content does not exist.</p>
+          <div id="convergence" class="convergence pending"><strong>Awaiting second run</strong><span>Approval remains locked.</span></div>
+        </section>
+
+        <section class="panel approval-panel">
+          <div class="section-heading"><div><p class="step">04 · APPROVE</p><h2>Human reconciliation gate</h2></div><span id="gate-state" class="status-pill locked">Locked</span></div>
+          <div id="blockers" class="blockers"></div>
+          <form id="approval-form">
+            <label class="check"><input name="inventory_reviewed" type="checkbox" /> I reviewed the complete document inventory and provenance.</label>
+            <label class="check"><input name="exceptions_reviewed" type="checkbox" /> I reviewed every failure, exclusion, invalid PDF and duplicate.</label>
+            <label class="check"><input name="robots_reviewed" type="checkbox" /> I reviewed the robots snapshot and sitemap evidence.</label>
+            <label class="check"><input name="archive_coverage_reviewed" type="checkbox" /> I reconciled visible archive, category and navigation coverage.</label>
+            <div class="approval-row"><label>Reviewer name<input id="reviewer" required placeholder="Your name" /></label><button id="approve-button" class="primary" disabled>Approve corpus</button></div>
+          </form>
+          <div id="approval-result" class="approval-result hidden"></div>
+        </section>
+      </section>
+    </main>
+    <div id="toast" role="status"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

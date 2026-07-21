@@ -52,6 +52,10 @@ Convergence is evidence that repeated bounded discovery is stable. It is not, by
 
 - dynamic Playwright discovery;
 - archive/category coverage model;
-- UI and approval workflow.
+- controlled live AISATS evidence and user acceptance of the validation UI.
+
+The validation UI and persisted approval workflow are implemented in M2 Increment 1. It exposes
+the current static crawler and does not remove the need for dynamic discovery or explicit
+archive/category reconciliation.
 
 Those items remain required before M1 can satisfy its milestone exit gate.
