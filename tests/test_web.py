@@ -3,18 +3,31 @@ from __future__ import annotations
 import time
 
 from fastapi.testclient import TestClient
+import fitz
 
+from okf_platform.corpus import LocalCorpusStore
 from okf_platform.models import (
-    AssetKind,
-    AssetRecord,
     CrawlReport,
     DocumentRecord,
+    FetchResponse,
     UrlRecord,
     UrlStatus,
 )
 from okf_platform.qa import FindingSeverity, ProbeResult, QaFinding, QaReport
 from okf_platform.run_service import RunConfig
 from okf_platform.web import create_app
+
+
+def _pdf_fixture() -> bytes:
+    document = fitz.open()
+    page = document.new_page()
+    page.insert_text((72, 72), "AISATS annual report")
+    payload = document.tobytes()
+    document.close()
+    return payload
+
+
+PDF_FIXTURE = _pdf_fixture()
 
 
 def _runner(config: RunConfig, checkpoint, run_id, data_dir) -> CrawlReport:
@@ -38,41 +51,44 @@ def _runner(config: RunConfig, checkpoint, run_id, data_dir) -> CrawlReport:
         200,
         content_type="application/pdf",
     )
+    corpus = LocalCorpusStore(data_dir / "corpus")
+    html = corpus.save(
+        run_id,
+        FetchResponse(
+            config.target_url,
+            config.target_url,
+            200,
+            {"content-type": "text/html"},
+            b"<h1>AISATS</h1><p>Ground handling services.</p>",
+        ),
+        referring_url=None,
+        discovered_by="crawler:target",
+    )
+    pdf_bytes = PDF_FIXTURE
+    pdf = corpus.save(
+        run_id,
+        FetchResponse(
+            document_url,
+            document_url,
+            200,
+            {"content-type": "application/pdf"},
+            pdf_bytes,
+        ),
+        referring_url=config.target_url,
+        discovered_by="crawler:html_link",
+    )
     report.documents.append(
-        DocumentRecord(document_url, config.target_url, "report.pdf", 1200, "b" * 64, True, 2)
+        DocumentRecord(
+            document_url,
+            config.target_url,
+            "report.pdf",
+            len(pdf_bytes),
+            pdf.sha256,
+            True,
+            1,
+        )
     )
-    report.assets.extend(
-        [
-            AssetRecord(
-                config.target_url,
-                config.target_url,
-                None,
-                AssetKind.HTML,
-                "index.html",
-                ".html",
-                "text/html",
-                "text/html",
-                100,
-                "a" * 64,
-                "corpus://objects/html/aa/a.html",
-                "crawler:target",
-            ),
-            AssetRecord(
-                document_url,
-                document_url,
-                config.target_url,
-                AssetKind.PDF,
-                "report.pdf",
-                ".pdf",
-                "application/pdf",
-                "application/pdf",
-                1200,
-                "b" * 64,
-                "corpus://objects/pdf/bb/b.pdf",
-                "crawler:html_link",
-            ),
-        ]
-    )
+    report.assets.extend([html, pdf])
     checkpoint(report)
     return report
 
@@ -149,6 +165,12 @@ def test_approval_requires_convergence_and_all_human_confirmations(tmp_path) -> 
         assert approval.status_code == 200
         assert approval.json()["id"].startswith("corpus-")
         assert len(approval.json()["report_sha256"]) == 64
+        assert approval.json()["corpus_snapshot"]["object_count"] == 2
+        extraction = client.post(
+            f"/api/corpora/{approval.json()['id']}/stage2/extraction"
+        )
+        assert extraction.status_code == 200
+        assert extraction.json()["text_unit_count"] == 2
         assert client.post(
             f"/api/runs/{second['id']}/approval",
             json={
@@ -169,3 +191,50 @@ def _await_qa(client: TestClient, run_id: str) -> dict[str, object]:
             return payload
         time.sleep(0.01)
     raise AssertionError("QA did not finish")
+
+
+def _qa_gap_runner(config: RunConfig, report: CrawlReport) -> QaReport:
+    return QaReport(
+        "fail",
+        [ProbeResult("independent-browser", frozenset(report.urls))],
+        [
+            QaFinding(
+                "UNRESOLVED_BASELINE",
+                FindingSeverity.BLOCKER,
+                "Crawler has 1 invalid or unresolved outcome",
+                ("https://example.com/missing image.png",),
+            )
+        ],
+    )
+
+
+def test_reviewer_can_accept_a_coverage_gap_with_audited_exception(tmp_path) -> None:
+    with TestClient(create_app(data_dir=tmp_path, runner=_runner, qa_runner=_qa_gap_runner)) as client:
+        first = client.post("/api/runs", json={"url": "https://example.com/"}).json()
+        _await_run(client, first["id"])
+        second = client.post(f"/api/runs/{first['id']}/verification").json()
+        _await_run(client, second["id"])
+        client.post(f"/api/runs/{second['id']}/qa")
+        run = _await_qa(client, second["id"])
+        assert run["approval_gate"]["eligible_with_exceptions"]
+        finding = run["qa"]["report"]["findings"][0]
+        payload = {
+            "reviewer": "Madhu",
+            "inventory_reviewed": True,
+            "exceptions_reviewed": True,
+            "robots_reviewed": True,
+            "archive_coverage_reviewed": True,
+            "qa_findings_reviewed": True,
+            "qa_exceptions": [
+                {
+                    "finding_fingerprint": finding["fingerprint"],
+                    "accepted": True,
+                    "reason": "The missing decorative image does not affect the knowledge scope.",
+                    "residual_risk": "Visual branding may be incomplete.",
+                }
+            ],
+        }
+        approval = client.post(f"/api/runs/{second['id']}/approval", json=payload)
+        assert approval.status_code == 200
+        assert approval.json()["qa_effective_verdict"] == "accepted_with_exceptions"
+        assert approval.json()["accepted_qa_exceptions"][0]["accepted_by"] == "Madhu"

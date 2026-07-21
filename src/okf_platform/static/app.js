@@ -87,17 +87,19 @@ function renderQa(run) {
   if (["queued","running"].includes(qa.status)) { node.className="convergence pending"; node.innerHTML="<strong>QA critic is running</strong><span>Read-only browser challenge in progress.</span>"; return; }
   if (qa.status === "failed") { node.className="convergence fail"; node.innerHTML=`<strong>QA execution failed</strong><span>${escapeHtml(qa.error || "Unknown error")}</span>`; return; }
   const report = qa.report;
-  if (!report) { node.className="convergence pending"; node.innerHTML="<strong>QA not started</strong><span>Approval remains locked.</span>"; $("#qa-findings").innerHTML=""; return; }
+  if (!report) { node.className="convergence pending"; node.innerHTML="<strong>QA not started</strong><span>Approval remains locked.</span>"; $("#qa-findings").innerHTML=""; $("#exception-controls").innerHTML=""; return; }
   node.className=`convergence ${report.verdict === "pass" ? "pass" : "fail"}`;
   node.innerHTML=`<strong>QA verdict: ${escapeHtml(report.verdict)}</strong><span>${report.probes.length} independent probe(s)</span>`;
-  $("#qa-findings").innerHTML=(report.findings || []).map(f=>`<article class="finding ${escapeHtml(f.severity)}"><span class="badge">${escapeHtml(f.severity)}</span><strong>${escapeHtml(f.code)}</strong><p>${escapeHtml(f.message)}</p>${(f.urls||[]).length ? `<details><summary>${f.urls.length} URL(s)</summary>${f.urls.map(u=>`<div class="mono wrap">${escapeHtml(u)}</div>`).join("")}</details>` : ""}</article>`).join("");
+  $("#qa-findings").innerHTML=(report.findings || []).map(f=>`<article class="finding ${escapeHtml(f.severity)}"><span class="badge">${escapeHtml(f.severity)}</span><strong>${escapeHtml(f.code)}</strong><p>${escapeHtml(f.message)}</p>${f.waivable ? '<p><em>This coverage gap may be accepted by the human reviewer with a recorded reason and residual risk.</em></p>' : ''}${(f.urls||[]).length ? `<details><summary>${f.urls.length} URL(s)</summary>${f.urls.map(u=>`<div class="mono wrap">${escapeHtml(u)}</div>`).join("")}</details>` : ""}</article>`).join("");
+  $("#exception-controls").innerHTML=(report.findings || []).filter(f=>f.waivable).map(f=>`<article class="exception-card" data-fingerprint="${escapeHtml(f.fingerprint)}"><label class="check"><input class="exception-accepted" type="checkbox" /> Accept ${escapeHtml(f.code)} for this corpus snapshot</label><label>Acceptance rationale<textarea class="exception-reason" placeholder="Why is this specific gap acceptable for the intended use?"></textarea></label><label>Residual risk<textarea class="exception-risk" placeholder="What can still be missing or wrong downstream?"></textarea></label></article>`).join("");
 }
 
 function renderGate(run) {
   const gate = run.approval_gate; const state = $("#gate-state");
-  state.textContent = gate.eligible ? "Ready for review" : "Locked"; state.className = `status-pill ${gate.eligible ? "complete" : "locked"}`;
-  $("#blockers").innerHTML = gate.blockers.length ? `<strong>Automatic blockers</strong><ul>${gate.blockers.map(item=>`<li>${escapeHtml(item)}</li>`).join("")}</ul>` : "<strong>Automated checks passed.</strong> Complete your manual review below.";
-  $("#approve-button").disabled = !gate.eligible || Boolean(run.approval);
+  const conditionallyReady = gate.eligible_with_exceptions;
+  state.textContent = gate.eligible ? "Ready for review" : conditionallyReady ? "Exception review" : "Locked"; state.className = `status-pill ${gate.eligible || conditionallyReady ? "complete" : "locked"}`;
+  $("#blockers").innerHTML = gate.blockers.length ? `<strong>${conditionallyReady ? "Coverage gaps need your decision" : "Automatic blockers"}</strong><ul>${gate.blockers.map(item=>`<li>${escapeHtml(item)}</li>`).join("")}</ul>${conditionallyReady ? '<p>You may approve only after explicitly accepting each displayed QA gap. Integrity, tool and storage failures cannot be bypassed.</p>' : ''}` : "<strong>Automated checks passed.</strong> Complete your manual review below.";
+  $("#approve-button").disabled = !(gate.eligible || conditionallyReady) || Boolean(run.approval);
 }
 
 $("#verify-button").addEventListener("click", async () => {
@@ -118,14 +120,22 @@ $("#approval-form").addEventListener("submit", async event => {
   event.preventDefault(); const form = new FormData(event.target);
   const payload = {reviewer:$("#reviewer").value};
   ["inventory_reviewed","exceptions_reviewed","robots_reviewed","archive_coverage_reviewed","qa_findings_reviewed"].forEach(key=>payload[key]=form.get(key)==="on");
+  payload.qa_exceptions=[...document.querySelectorAll(".exception-card")].filter(card=>card.querySelector(".exception-accepted").checked).map(card=>({finding_fingerprint:card.dataset.fingerprint,accepted:true,reason:card.querySelector(".exception-reason").value,residual_risk:card.querySelector(".exception-risk").value}));
   try { const approval = await api(`/api/runs/${activeRun.id}/approval`, {method:"POST",body:JSON.stringify(payload)}); renderApproval(approval); toast("Corpus approved and frozen"); }
   catch (error) { toast(error.message); }
 });
 
 function renderApproval(approval) {
   const node=$("#approval-result"); node.classList.remove("hidden");
-  node.innerHTML=`<strong>Approved corpus: ${escapeHtml(approval.id)}</strong><br>Reviewer: ${escapeHtml(approval.reviewer)} · Evidence hash: <span class="mono">${approval.report_sha256}</span>`;
+  node.innerHTML=`<strong>Approved corpus: ${escapeHtml(approval.id)}</strong><br>Reviewer: ${escapeHtml(approval.reviewer)} · Effective QA: ${escapeHtml(approval.qa_effective_verdict)} · Accepted gaps: ${(approval.accepted_qa_exceptions||[]).length}<br>Frozen objects: ${approval.corpus_snapshot.object_count} · Snapshot hash: <span class="mono">${approval.corpus_snapshot.manifest_sha256}</span>`;
   $("#approve-button").disabled=true;
+  $("#stage2-panel").classList.remove("hidden"); $("#stage2-button").disabled=false; $("#stage2-button").dataset.corpusId=approval.id;
 }
+
+$("#stage2-button").addEventListener("click", async () => {
+  const button=$("#stage2-button"); button.disabled=true; $("#stage2-result").innerHTML="<strong>Stage 2 extraction is running</strong><span>Reading the immutable snapshot.</span>";
+  try { const result=await api(`/api/corpora/${button.dataset.corpusId}/stage2/extraction`, {method:"POST"}); const counts=Object.entries(result.status_counts||{}).map(([key,value])=>`${key}: ${value}`).join(" · "); $("#stage2-result").className="convergence pass"; $("#stage2-result").innerHTML=`<strong>Extraction complete · ${result.text_unit_count} text unit(s)</strong><span>${escapeHtml(counts)} · Records hash ${escapeHtml(result.records_sha256.slice(0,16))}…</span>`; }
+  catch(error) { $("#stage2-result").className="convergence fail"; $("#stage2-result").innerHTML=`<strong>Extraction failed</strong><span>${escapeHtml(error.message)}</span>`; button.disabled=false; }
+});
 
 function escapeHtml(value) { const div=document.createElement("div"); div.textContent=String(value); return div.innerHTML; }

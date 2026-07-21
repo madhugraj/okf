@@ -9,8 +9,8 @@
   <body>
     <header class="masthead">
       <div>
-        <p class="eyebrow">OPEN KNOWLEDGE FORMAT · STAGE 1</p>
-        <h1>Validate the corpus before knowledge extraction.</h1>
+        <p class="eyebrow">OPEN KNOWLEDGE FORMAT · STAGES 1–2</p>
+        <h1>Validate the corpus, then prepare traceable knowledge.</h1>
         <p class="lede">Discover and preserve every asset, test repeatability, challenge coverage with independent QA, and approve only when the evidence survives criticism.</p>
       </div>
       <div class="gate-pill"><span></span> Human approval required</div>
@@ -82,6 +82,7 @@
           <div class="section-heading"><div><p class="step">05 · APPROVE</p><h2>Human reconciliation gate</h2></div><span id="gate-state" class="status-pill locked">Locked</span></div>
           <div id="blockers" class="blockers"></div>
           <form id="approval-form">
+            <div id="exception-controls" class="exception-controls"></div>
             <label class="check"><input name="inventory_reviewed" type="checkbox" /> I reviewed the typed asset inventory, storage URI and provenance.</label>
             <label class="check"><input name="exceptions_reviewed" type="checkbox" /> I reviewed every failure, exclusion, invalid PDF and duplicate.</label>
             <label class="check"><input name="robots_reviewed" type="checkbox" /> I reviewed the robots snapshot and sitemap evidence.</label>
@@ -90,6 +91,15 @@
             <div class="approval-row"><label>Reviewer name<input id="reviewer" required placeholder="Your name" /></label><button id="approve-button" class="primary" disabled>Approve corpus</button></div>
           </form>
           <div id="approval-result" class="approval-result hidden"></div>
+        </section>
+
+        <section id="stage2-panel" class="panel hidden">
+          <div class="section-heading">
+            <div><p class="step">STAGE 2 · NORMALIZE</p><h2>Extract typed, source-linked text</h2></div>
+            <button id="stage2-button" class="primary" disabled>Run Stage 2 extraction</button>
+          </div>
+          <p class="help">Stage 2 reads only the frozen corpus snapshot. PDF pages, HTML, code, structured data and modern Office files are normalized with provenance. Binary types without an adapter remain visible as not extractable.</p>
+          <div id="stage2-result" class="convergence pending"><strong>Awaiting approved corpus</strong><span>No mutable crawl evidence is used.</span></div>
         </section>
       </section>
     </main>

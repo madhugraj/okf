@@ -41,6 +41,8 @@ M2 Increment 1 adds the local validation UI: crawl configuration, live progress,
 
 M2 Increment 2 separates repeat-run stability from adversarial QA, combines deterministic HTTP/sitemap discovery with Playwright-rendered discovery, and adds mandatory typed, content-addressed raw corpus storage. See [Discovery, adversarial QA and corpus storage](docs/crawler-qa-and-corpus-storage.md).
 
+Stage 2 Increment 1 adds audited human acceptance for bounded QA coverage gaps, freezes a hash-verified corpus snapshot, and creates deterministic typed extraction records with page/span provenance. See [Stage 2 plan](docs/stage-2-plan.md).
+
 ## Run the validation UI
 
 Python 3.12 is required. From the repository root:
