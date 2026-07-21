@@ -16,6 +16,24 @@ def test_html_discovery_resolves_and_deduplicates_links() -> None:
     ]
 
 
+def test_html_discovery_includes_media_code_and_srcset_assets() -> None:
+    links = discover_html_links(
+        b'''<img src="/hero.png" srcset="/hero-2x.png 2x, /hero.webp 1x">
+            <video src="/intro.mp4"><source src="/intro.webm"></video>
+            <script src="/app.js"></script><link rel="stylesheet" href="/app.css">''',
+        "https://example.com/",
+    )
+    assert links == [
+        "https://example.com/hero.png",
+        "https://example.com/hero-2x.png",
+        "https://example.com/hero.webp",
+        "https://example.com/intro.mp4",
+        "https://example.com/intro.webm",
+        "https://example.com/app.js",
+        "https://example.com/app.css",
+    ]
+
+
 def test_urlset_sitemap_discovery() -> None:
     xml = b"""<?xml version="1.0"?>
     <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
