@@ -23,6 +23,21 @@ class UrlStatus(StrEnum):
     UNRESOLVED_AFTER_RETRIES = "unresolved_after_retries"
 
 
+class AssetKind(StrEnum):
+    """Storage and downstream-processing class for an immutable raw asset."""
+
+    PDF = "pdf"
+    IMAGE = "image"
+    VIDEO = "video"
+    HTML = "html"
+    CODE = "code"
+    OFFICE = "office"
+    AUDIO = "audio"
+    ARCHIVE = "archive"
+    STRUCTURED_DATA = "structured_data"
+    OTHER = "other"
+
+
 TERMINAL_STATUSES = frozenset(
     {
         UrlStatus.PAGE_PROCESSED,
@@ -95,12 +110,33 @@ class DocumentRecord:
 
 
 @dataclass(slots=True)
+class AssetRecord:
+    """Raw corpus object plus source and storage provenance."""
+
+    url: str
+    final_url: str
+    referring_url: str | None
+    kind: AssetKind
+    filename: str
+    extension: str
+    declared_mime: str | None
+    detected_mime: str
+    byte_size: int
+    sha256: str
+    storage_uri: str | None
+    discovered_by: str
+    saved_at: str | None = None
+
+
+@dataclass(slots=True)
 class CrawlReport:
     """Serializable evidence bundle for a bounded discovery run."""
 
     target_url: str
     urls: dict[str, UrlRecord] = field(default_factory=dict)
     documents: list[DocumentRecord] = field(default_factory=list)
+    assets: list[AssetRecord] = field(default_factory=list)
+    discovery_evidence: list[dict[str, Any]] = field(default_factory=list)
     discovered_edges: list[tuple[str, str]] = field(default_factory=list)
     budget_exhausted: bool = False
     robots_url: str | None = None
@@ -127,6 +163,11 @@ class CrawlReport:
         report = cls(
             target_url=payload["target_url"],
             documents=[DocumentRecord(**item) for item in payload.get("documents", [])],
+            assets=[
+                AssetRecord(**{**item, "kind": AssetKind(item["kind"])})
+                for item in payload.get("assets", [])
+            ],
+            discovery_evidence=list(payload.get("discovery_evidence", [])),
             discovered_edges=[tuple(item) for item in payload.get("discovered_edges", [])],
             budget_exhausted=payload.get("budget_exhausted", False),
             robots_url=payload.get("robots_url"),

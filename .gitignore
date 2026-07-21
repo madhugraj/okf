@@ -8,6 +8,8 @@ pytest-of-root/
 .coverage
 htmlcov/
 .venv/
+.venv*/
+.test-deps/
 venv/
 .env
 .env.*
@@ -26,3 +28,6 @@ data/corpora/
 artifacts/
 .okf-data/
 uv.lock
+pip-metadata-*/
+pip-target-*/
+pip-unpack-*/

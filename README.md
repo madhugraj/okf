@@ -39,6 +39,8 @@ M1 Increment 2 adds robots enforcement, retry evidence, recursive sitemaps, atom
 
 M2 Increment 1 adds the local validation UI: crawl configuration, live progress, document and exception inspection, independent-run convergence, evidence download, and a persisted human corpus-approval manifest. See the [validation UI guide](docs/validation-ui.md).
 
+M2 Increment 2 separates repeat-run stability from adversarial QA, combines deterministic HTTP/sitemap discovery with Playwright-rendered discovery, and adds mandatory typed, content-addressed raw corpus storage. See [Discovery, adversarial QA and corpus storage](docs/crawler-qa-and-corpus-storage.md).
+
 ## Run the validation UI
 
 Python 3.12 is required. From the repository root:
@@ -47,6 +49,7 @@ Python 3.12 is required. From the repository root:
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
+playwright install chromium
 okf-ui
 ```
 

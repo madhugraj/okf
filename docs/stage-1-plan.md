@@ -6,20 +6,21 @@ A reviewer can submit one of the pilot website URLs, observe the crawl, inspect 
 
 ## User journey
 
-1. Create a crawl with target URL, allowed hosts, PDF filter, rate limit and resource budget.
+1. Create a crawl with target URL, allowed hosts, asset-type policy, rate limit and resource budget.
 2. Review the resolved policy before starting.
 3. Watch pages and documents move through live states.
 4. Inspect the inventory, source-page provenance, validation and duplicate groups.
 5. Review coverage evidence and unresolved exceptions.
-6. Rerun/recover or approve the corpus.
-7. Receive a corpus version and manifest.
+6. Repeat the crawler to test stability.
+7. Run the separate read-only adversarial QA critic and resolve gaps.
+8. Approve the corpus and receive a versioned manifest.
 
 ## Functional scope
 
 ### New Crawl
 
 - Target URL and allowed-domain preview
-- PDF-only initial filter
+- Typed PDF, image, video, HTML, code, Office, audio, archive and structured-data capture
 - Same-site archive inclusion
 - Crawl depth, page, duration, concurrency and download-size budgets
 - Robots and policy acknowledgement
@@ -28,12 +29,12 @@ A reviewer can submit one of the pilot website URLs, observe the crawl, inspect 
 
 - Run state and timestamps
 - Pages queued, processed, failed and excluded
-- Documents discovered, downloaded, validated and deduplicated
+- Raw assets discovered, content-addressed, classified, validated and deduplicated
 - Current activity and recent events
 - Pause, resume and cancel
 - Bounded retry status
 
-### Document Inventory
+### Typed Corpus Inventory
 
 - Search and filters by source path, status, MIME, year and duplicate group
 - Original URL and referring page
@@ -41,6 +42,7 @@ A reviewer can submit one of the pilot website URLs, observe the crawl, inspect 
 - Text/scanned classification when available
 - Safe preview or download link
 - Inclusion/exclusion review state
+- Asset type, detected and declared MIME, storage URI and discovery tool
 
 ### Coverage and Approval
 
@@ -48,6 +50,7 @@ A reviewer can submit one of the pilot website URLs, observe the crawl, inspect 
 - Archive traversal evidence
 - Failure and exclusion register
 - Convergence result
+- Independent QA findings, severity and verdict
 - Readiness controls
 - Rerun/recover action
 - Approve/reject with comment
@@ -58,10 +61,10 @@ A reviewer can submit one of the pilot website URLs, observe the crawl, inspect 
 | Increment | Deliverable | Exit evidence |
 |---|---|---|
 | S1.1 Policy and seeds | URL safety, scope, sitemap and robots snapshot | Policy tests pass |
-| S1.2 Static discovery | Link frontier, pagination and PDF discovery | Fixture recall passes |
+| S1.2 Static discovery | Link frontier, pagination and typed asset discovery | Fixture recall passes |
 | S1.3 Retrieval | Idempotent downloads, hashes, retries and provenance | Failure-injection tests pass |
-| S1.4 Validation | PDF signature/parse checks and exact duplicates | Corrupt/duplicate fixtures pass |
-| S1.5 Reconciliation | Coverage bundle and convergence rule | Synthetic-site oracle matches |
+| S1.4 Validation | Asset classification, PDF checks and exact duplicates | Corrupt/duplicate fixtures pass |
+| S1.5 Reconciliation | Stability plus adversarial QA coverage bundle | Synthetic-site oracle matches |
 | S1.6 API and events | Run control, inventory API and event stream | Contract tests pass |
 | S1.7 Frontend | Four Stage 1 screens | User acceptance walkthrough passes |
 | S1.8 AISATS pilot | Site inventory and evidence report | Reviewer accepts or records gaps |
@@ -106,14 +109,15 @@ A run may enter `awaiting_approval` only when:
 3. every discovered URL has a terminal status;
 4. all mandatory discovery surfaces have reconciliation records;
 5. retry budgets are exhausted or failures resolved;
-6. a second discovery pass produces no new qualifying canonical URLs; and
-7. the coverage bundle and manifest validate.
+6. a repeat crawler pass produces no new qualifying canonical URLs;
+7. the read-only QA critic returns `pass`; and
+8. the coverage bundle, raw storage references and manifest validate.
 
 The stopping rule does not auto-approve the corpus.
 
 ## Stage 1 definition of done
 
-- All four user screens satisfy approved acceptance tests.
+- All five validation workflow sections satisfy approved acceptance tests.
 - AISATS and Kolte Patil runs complete without unclassified failures.
 - Every qualifying document is downloaded or appears in the exception register.
 - Raw evidence, metadata and audit events are reproducible from a run ID.

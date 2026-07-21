@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import uvicorn
 
-from .run_service import RunConfig, RunService, Runner, execute_crawl
+from .run_service import QaRunner, RunConfig, RunService, Runner, execute_crawl, execute_qa
 
 
 class CrawlRequest(BaseModel):
@@ -29,12 +29,22 @@ class ApprovalRequest(BaseModel):
     exceptions_reviewed: bool = False
     robots_reviewed: bool = False
     archive_coverage_reviewed: bool = False
+    qa_findings_reviewed: bool = False
 
 
-def create_app(*, data_dir: Path | None = None, runner: Runner = execute_crawl) -> FastAPI:
-    app = FastAPI(title="OKF Crawl Validation", version="0.3.0")
+def create_app(
+    *,
+    data_dir: Path | None = None,
+    runner: Runner = execute_crawl,
+    qa_runner: QaRunner = execute_qa,
+) -> FastAPI:
+    app = FastAPI(title="OKF Crawl Validation", version="0.4.0")
     static_dir = Path(__file__).with_name("static")
-    store = RunService(data_dir or Path(os.getenv("OKF_DATA_DIR", ".okf-data")), runner=runner)
+    store = RunService(
+        data_dir or Path(os.getenv("OKF_DATA_DIR", ".okf-data")),
+        runner=runner,
+        qa_runner=qa_runner,
+    )
     app.state.run_service = store
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
@@ -75,6 +85,15 @@ def create_app(*, data_dir: Path | None = None, runner: Runner = execute_crawl) 
     def start_verification(run_id: str) -> dict[str, object]:
         try:
             return store.start_verification(run_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="crawl run not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/runs/{run_id}/qa", status_code=202)
+    def start_qa(run_id: str) -> dict[str, object]:
+        try:
+            return store.start_qa(run_id)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="crawl run not found") from exc
         except ValueError as exc:

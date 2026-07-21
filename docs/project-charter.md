@@ -84,8 +84,8 @@ These measures prove coverage of observable discovery surfaces. They do not clai
 ## Open decisions
 
 1. Approve the formal OKF schema and validation rules.
-2. Confirm whether Stage 1 remains PDF-only or includes office documents.
-3. Confirm deployment target and object-storage implementation.
+2. Confirm the production object-storage endpoint and retention policy; local development uses the implemented content-addressed filesystem store.
+3. Confirm the PostgreSQL deployment target for production metadata; local development uses SQLite.
 4. Confirm model providers and data-handling constraints for later stages.
 5. Select the expert process for gold-question and reference-answer creation.
 6. Select a repository licence before external reuse or contribution.

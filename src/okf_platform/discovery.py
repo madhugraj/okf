@@ -21,10 +21,18 @@ class _LinkParser(HTMLParser):
             self.base_href = values["href"]
         if tag == "a" and values.get("href"):
             self.links.append(values["href"])
-        if tag in {"iframe", "embed"} and values.get("src"):
+        if tag in {"iframe", "embed", "img", "script", "source", "video", "audio", "track"} and values.get("src"):
             self.links.append(values["src"])
+        if tag == "link" and values.get("href"):
+            self.links.append(values["href"])
         if tag == "object" and values.get("data"):
             self.links.append(values["data"])
+        if tag in {"img", "source"} and values.get("srcset"):
+            self.links.extend(
+                candidate.strip().split(" ", 1)[0]
+                for candidate in values["srcset"].split(",")
+                if candidate.strip()
+            )
 
 
 def discover_html_links(html: bytes, page_url: str) -> list[str]:

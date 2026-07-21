@@ -3,18 +3,29 @@
 from __future__ import annotations
 
 from collections import deque
+import hashlib
 from pathlib import PurePosixPath
 import time
 from typing import Callable
 from urllib.parse import unquote, urlsplit
 
 from .discovery import discover_html_links, discover_sitemap_urls
-from .models import CrawlReport, DocumentRecord, FetchAttempt, FetchResponse, UrlRecord, UrlStatus
+from .corpus import classify_asset
+from .models import (
+    AssetRecord,
+    CrawlReport,
+    DocumentRecord,
+    FetchAttempt,
+    FetchResponse,
+    UrlRecord,
+    UrlStatus,
+)
 from .pdf import validate_pdf
 from .policy import CrawlPolicy, PolicyViolation, canonicalise_url, ensure_in_scope
 from .robots import RobotsRules
 
 Fetcher = Callable[[str], FetchResponse]
+AssetSink = Callable[[FetchResponse, str | None, str], AssetRecord]
 
 
 def looks_like_pdf(url: str) -> bool:
@@ -37,12 +48,14 @@ class CrawlEngine:
         robots: RobotsRules | None = None,
         sleeper: Callable[[float], None] = time.sleep,
         checkpoint: Callable[[CrawlReport], None] | None = None,
+        asset_sink: AssetSink | None = None,
     ) -> None:
         self.policy = policy
         self.fetch = fetch
         self.robots = robots
         self.sleeper = sleeper
         self.checkpoint = checkpoint
+        self.asset_sink = asset_sink
 
     def run(
         self,
@@ -151,7 +164,30 @@ class CrawlEngine:
                 self._checkpoint(report)
                 continue
 
-            is_pdf = response.content_type == "application/pdf" or looks_like_pdf(response.final_url)
+            if self.asset_sink:
+                asset = self.asset_sink(response, record.referring_url, record.discovery_method)
+            else:
+                kind, extension, detected_mime = classify_asset(
+                    response.final_url, response.content_type, response.body
+                )
+                asset = AssetRecord(
+                    url=url,
+                    final_url=response.final_url,
+                    referring_url=record.referring_url,
+                    kind=kind,
+                    filename=PurePosixPath(unquote(urlsplit(response.final_url).path)).name
+                    or f"index{extension}",
+                    extension=extension,
+                    declared_mime=response.content_type or None,
+                    detected_mime=detected_mime,
+                    byte_size=len(response.body),
+                    sha256=hashlib.sha256(response.body).hexdigest(),
+                    storage_uri=None,
+                    discovered_by=record.discovery_method,
+                )
+            report.assets.append(asset)
+
+            is_pdf = asset.kind.value == "pdf" or looks_like_pdf(response.final_url)
             if is_pdf:
                 evidence = validate_pdf(response.body)
                 duplicate_of = seen_hashes.get(evidence.sha256)
@@ -201,8 +237,7 @@ class CrawlEngine:
                     enqueue(link, url, "html_link", record.depth + 1)
                 record.status = UrlStatus.PAGE_PROCESSED
             else:
-                record.status = UrlStatus.EXCLUDED_BY_POLICY
-                record.reason = f"unsupported content type: {response.content_type or 'unknown'}"
+                record.status = UrlStatus.DOWNLOADED_VALID
 
             self._checkpoint(report)
 

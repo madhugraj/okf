@@ -11,7 +11,7 @@
       <div>
         <p class="eyebrow">OPEN KNOWLEDGE FORMAT · STAGE 1</p>
         <h1>Validate the corpus before knowledge extraction.</h1>
-        <p class="lede">Discover PDFs, review every exception, verify a second run, and approve only when the evidence is stable.</p>
+        <p class="lede">Discover and preserve every asset, test repeatability, challenge coverage with independent QA, and approve only when the evidence survives criticism.</p>
       </div>
       <div class="gate-pill"><span></span> Human approval required</div>
     </header>
@@ -20,7 +20,7 @@
       <section class="panel setup-panel">
         <div class="section-heading">
           <div><p class="step">01 · DISCOVER</p><h2>Start a controlled crawl</h2></div>
-          <p>Public, same-domain pages and PDFs only. Robots rules are enforced.</p>
+          <p>HTTP/sitemap discovery plus Playwright-rendered discovery. Robots rules are enforced.</p>
         </div>
         <form id="crawl-form" class="crawl-form">
           <label class="url-field">Website URL<input id="url" type="url" value="https://www.aisats.in/" required /></label>
@@ -40,7 +40,7 @@
         <div class="metrics">
           <article><span>URLs discovered</span><strong id="metric-urls">0</strong></article>
           <article><span>Terminal outcomes</span><strong id="metric-terminal">0</strong></article>
-          <article><span>PDF records</span><strong id="metric-documents">0</strong></article>
+          <article><span>Stored raw assets</span><strong id="metric-assets">0</strong></article>
           <article class="warning"><span>Exceptions to review</span><strong id="metric-exceptions">0</strong></article>
         </div>
         <div class="progress-track"><div id="progress-bar"></div></div>
@@ -52,8 +52,8 @@
 
         <section class="panel inventory-panel">
           <div class="section-heading">
-            <div><p class="step">02 · INSPECT</p><h2>Evidence inventory</h2></div>
-            <div class="tabs"><button class="tab active" data-tab="documents">Documents</button><button class="tab" data-tab="exceptions">Exceptions</button><button class="tab" data-tab="urls">All URLs</button></div>
+            <div><p class="step">02 · INSPECT</p><h2>Typed corpus inventory</h2></div>
+            <div class="tabs"><button class="tab active" data-tab="assets">All assets</button><button class="tab" data-tab="documents">PDFs</button><button class="tab" data-tab="exceptions">Exceptions</button><button class="tab" data-tab="urls">URLs</button></div>
           </div>
           <div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div>
           <p id="empty-table" class="empty">Evidence will appear as the crawler progresses.</p>
@@ -61,21 +61,32 @@
 
         <section class="panel verification-panel">
           <div class="section-heading">
-            <div><p class="step">03 · VERIFY</p><h2>Run independent discovery again</h2></div>
-            <button id="verify-button" class="secondary" disabled>Run verification crawl</button>
+            <div><p class="step">03 · STABILITY</p><h2>Repeat the crawler for a stability check</h2></div>
+            <button id="verify-button" class="secondary" disabled>Run stability crawl</button>
           </div>
-          <p class="help">A second crawl must produce no new URLs, missing URLs, or document hashes. Stability supports review; it does not prove invisible content does not exist.</p>
+          <p class="help">This repeats the crawler and detects instability. It is deliberately not labelled independent QA because it can share the crawler's blind spots.</p>
           <div id="convergence" class="convergence pending"><strong>Awaiting second run</strong><span>Approval remains locked.</span></div>
         </section>
 
+        <section class="panel verification-panel">
+          <div class="section-heading">
+            <div><p class="step">04 · ADVERSARIAL QA</p><h2>Challenge the crawler with a separate agent</h2></div>
+            <button id="qa-button" class="secondary" disabled>Run QA critic</button>
+          </div>
+          <p class="help">QA is read-only. It uses a browser-first rendered-DOM/network probe, compares its findings with the frozen crawler evidence, and blocks approval for unexplained gaps or failed QA tools.</p>
+          <div id="qa-verdict" class="convergence pending"><strong>QA not started</strong><span>Approval remains locked.</span></div>
+          <div id="qa-findings" class="qa-findings"></div>
+        </section>
+
         <section class="panel approval-panel">
-          <div class="section-heading"><div><p class="step">04 · APPROVE</p><h2>Human reconciliation gate</h2></div><span id="gate-state" class="status-pill locked">Locked</span></div>
+          <div class="section-heading"><div><p class="step">05 · APPROVE</p><h2>Human reconciliation gate</h2></div><span id="gate-state" class="status-pill locked">Locked</span></div>
           <div id="blockers" class="blockers"></div>
           <form id="approval-form">
-            <label class="check"><input name="inventory_reviewed" type="checkbox" /> I reviewed the complete document inventory and provenance.</label>
+            <label class="check"><input name="inventory_reviewed" type="checkbox" /> I reviewed the typed asset inventory, storage URI and provenance.</label>
             <label class="check"><input name="exceptions_reviewed" type="checkbox" /> I reviewed every failure, exclusion, invalid PDF and duplicate.</label>
             <label class="check"><input name="robots_reviewed" type="checkbox" /> I reviewed the robots snapshot and sitemap evidence.</label>
             <label class="check"><input name="archive_coverage_reviewed" type="checkbox" /> I reconciled visible archive, category and navigation coverage.</label>
+            <label class="check"><input name="qa_findings_reviewed" type="checkbox" /> I reviewed the QA probes, findings, severities and final verdict.</label>
             <div class="approval-row"><label>Reviewer name<input id="reviewer" required placeholder="Your name" /></label><button id="approve-button" class="primary" disabled>Approve corpus</button></div>
           </form>
           <div id="approval-result" class="approval-result hidden"></div>

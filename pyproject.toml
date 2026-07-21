@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "okf-platform"
-version = "0.3.0"
+version = "0.4.0"
 description = "Auditable website document discovery and OKF/RAG evaluation platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,7 @@ dependencies = [
   "fastapi>=0.115,<1",
   "langgraph>=0.2,<2",
   "pymupdf>=1.24,<2",
+  "playwright>=1.50,<2",
   "uvicorn>=0.30,<1",
 ]
 
