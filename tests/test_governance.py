@@ -38,7 +38,27 @@ def test_coverage_gap_requires_a_fingerprint_reason_and_residual_risk() -> None:
     assert assessment["accepted"][0]["accepted_by"] == "Madhu"
 
 
-def test_integrity_and_tool_failures_cannot_be_bypassed() -> None:
+def test_supplementary_crawler_discovery_failure_can_be_accepted() -> None:
+    report = _report("DISCOVERY_TOOL_FAILED")
+    finding = decorate_findings(report)[0]
+    assessment = assess_qa_exceptions(
+        report,
+        [
+            {
+                "finding_fingerprint": finding["fingerprint"],
+                "accepted": True,
+                "reason": "The remaining crawler evidence is sufficient for this bounded corpus.",
+                "residual_risk": "Rendered-only links may remain undiscovered.",
+            }
+        ],
+        reviewer="Madhu",
+    )
+    assert not assessment["pending"]
+    assert not assessment["hard"]
+    assert assessment["accepted"][0]["code"] == "DISCOVERY_TOOL_FAILED"
+
+
+def test_independent_qa_tool_failures_cannot_be_bypassed() -> None:
     report = _report("QA_TOOL_FAILED")
     finding = decorate_findings(report)[0]
     assessment = assess_qa_exceptions(report)

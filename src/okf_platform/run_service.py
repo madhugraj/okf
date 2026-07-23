@@ -23,7 +23,7 @@ from .policy import CrawlPolicy, canonicalise_url
 from .robots import RobotsRules
 from .transport import HttpTransport
 from .qa import QaReport, build_qa_graph
-from .snapshot import freeze_corpus_snapshot
+from .snapshot import freeze_corpus_snapshot, load_snapshot
 from .workflow import build_discovery_graph
 
 
@@ -241,6 +241,58 @@ class RunService:
     def list_runs(self) -> list[dict[str, object]]:
         runs = [self._decorate(json.loads(path.read_text(encoding="utf-8"))) for path in self.runs_dir.glob("*.json")]
         return sorted(runs, key=lambda item: str(item["created_at"]), reverse=True)
+
+    def list_approved_corpora(self) -> list[dict[str, object]]:
+        """List immutable approved snapshots that can be resumed without crawling."""
+
+        corpora: list[dict[str, object]] = []
+        for path in self.approvals_dir.glob("corpus-*.json"):
+            corpus_id = path.stem
+            summary: dict[str, object] = {
+                "id": corpus_id,
+                "integrity": "failed",
+                "reusable": False,
+            }
+            try:
+                approval = json.loads(path.read_text(encoding="utf-8"))
+                corpus_id = str(approval["id"])
+                summary["id"] = corpus_id
+                if corpus_id != path.stem:
+                    raise ValueError("approval ID does not match its immutable filename")
+                snapshot = load_snapshot(self.data_dir, corpus_id)
+                approval_snapshot = dict(approval.get("corpus_snapshot") or {})
+                if approval_snapshot.get("manifest_sha256") != snapshot["manifest_sha256"]:
+                    raise ValueError("approval and corpus snapshot hashes do not match")
+                if (
+                    snapshot["target_url"] != approval["target_url"]
+                    or snapshot["approved_at"] != approval["approved_at"]
+                    or snapshot["approved_by"] != approval["reviewer"]
+                ):
+                    raise ValueError("approval and corpus snapshot metadata do not match")
+                summary.update(
+                    {
+                        "target_url": approval["target_url"],
+                        "approved_at": approval["approved_at"],
+                        "reviewer": approval["reviewer"],
+                        "qa_effective_verdict": approval["qa_effective_verdict"],
+                        "accepted_qa_exception_count": len(
+                            approval.get("accepted_qa_exceptions") or []
+                        ),
+                        "source_run_id": snapshot["source_run_id"],
+                        "baseline_run_id": snapshot["baseline_run_id"],
+                        "corpus_snapshot": approval_snapshot,
+                        "integrity": "verified",
+                        "reusable": True,
+                    }
+                )
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                summary["integrity_error"] = f"{type(exc).__name__}: {exc}"
+            corpora.append(summary)
+        return sorted(
+            corpora,
+            key=lambda item: str(item.get("approved_at") or ""),
+            reverse=True,
+        )
 
     def approve(
         self,

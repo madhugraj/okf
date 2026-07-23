@@ -7,8 +7,10 @@ Accepted for implementation.
 ## Decision
 
 Coverage findings may be accepted by an identified human reviewer only when the finding code is on
-the explicit waivable allowlist. The reviewer must provide rationale and residual risk. Integrity,
-storage, execution and stability failures cannot be waived.
+the explicit waivable allowlist. This includes failure of a supplementary crawler-discovery tool,
+because the remaining crawler and QA evidence can still be reviewed as a bounded corpus. The
+reviewer must provide rationale and residual risk. Corpus integrity, storage, independent QA-tool
+execution and stability failures cannot be waived.
 
 Every approval creates a verified, immutable corpus snapshot. Stage 2 pipelines must use that
 snapshot rather than crawler state or mutable local folders. The first Stage 2 derivative is a

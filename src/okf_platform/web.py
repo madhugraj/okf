@@ -95,6 +95,10 @@ def create_app(
     def list_runs() -> list[dict[str, object]]:
         return store.list_runs()
 
+    @app.get("/api/corpora")
+    def list_approved_corpora() -> list[dict[str, object]]:
+        return store.list_approved_corpora()
+
     @app.post("/api/runs", status_code=202)
     def start_run(request: CrawlRequest) -> dict[str, object]:
         try:

@@ -5,6 +5,7 @@ let pollTimer = null;
 let activeCorpusId = null;
 let okfReady = false;
 let ragReady = false;
+let approvedCorpora = [];
 
 function toast(message) {
   const node = $("#toast"); node.textContent = message; node.classList.add("show");
@@ -43,9 +44,77 @@ async function loadRagRuntime() {
   }
 }
 
+async function loadApprovedCorpora() {
+  const select = $("#approved-corpus-select");
+  const button = $("#reuse-corpus-button");
+  const pill = $("#approved-cache-pill");
+  const status = $("#approved-cache-status");
+  try {
+    approvedCorpora = await api("/api/corpora");
+    const reusable = approvedCorpora.filter(item => item.reusable);
+    const failed = approvedCorpora.length - reusable.length;
+    select.innerHTML = reusable.length
+      ? reusable.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.target_url)} · ${escapeHtml(new Date(item.approved_at).toLocaleString())} · ${escapeHtml(item.id)}</option>`).join("")
+      : '<option value="">No reusable approved corpus</option>';
+    select.disabled = reusable.length === 0;
+    button.disabled = reusable.length === 0;
+    pill.textContent = reusable.length ? `${reusable.length} reusable` : "None saved";
+    pill.className = `status-pill ${reusable.length ? "complete" : "locked"}`;
+    status.innerHTML = reusable.length
+      ? `<strong>${reusable.length} approved snapshot(s) available.</strong> Reuse skips browser discovery, scrolling, stability crawling and QA because it continues from the already frozen approval.${failed ? ` ${failed} damaged approval record(s) were blocked by manifest verification.` : ""}`
+      : "No verified approved snapshots are available yet. Complete and approve one fresh crawl first.";
+  } catch (error) {
+    select.innerHTML = '<option value="">Approved corpus list unavailable</option>';
+    select.disabled = true; button.disabled = true;
+    pill.textContent = "Unavailable"; pill.className = "status-pill locked";
+    status.textContent = error.message;
+  }
+}
+
+function resetKnowledgeState() {
+  okfReady = false; ragReady = false;
+  $("#compare-button").disabled = true;
+  $("#okf-build-button").disabled = true;
+  $("#rag-build-button").disabled = true;
+  $("#okf-build-result").textContent = "Waiting for Stage 2.";
+  $("#rag-build-result").textContent = "Waiting for Stage 2.";
+  $("#knowledge-panel").classList.add("hidden");
+  $("#comparison-results").classList.add("hidden");
+}
+
+function activateApprovedCorpus(approval, reused = false) {
+  activeCorpusId = approval.id;
+  resetKnowledgeState();
+  $("#pipeline-workspace").classList.remove("hidden");
+  $("#stage2-panel").classList.remove("hidden");
+  const button = $("#stage2-button");
+  button.disabled = false;
+  button.dataset.corpusId = approval.id;
+  button.textContent = "Continue to Stage 2";
+  $("#stage2-result").className = "convergence pending";
+  $("#stage2-result").innerHTML = reused
+    ? "<strong>Approved snapshot reused</strong><span>No browser session or scrolling was started.</span>"
+    : "<strong>Approved snapshot ready</strong><span>No mutable crawl evidence is used.</span>";
+  $("#pipeline-corpus-title").textContent = approval.target_url;
+  $("#pipeline-corpus-pill").textContent = reused ? "Reused · manifest verified" : "New · manifest verified";
+  const snapshot = approval.corpus_snapshot || {};
+  $("#pipeline-corpus-details").innerHTML = `<strong>${escapeHtml(approval.id)}</strong> · approved by ${escapeHtml(approval.reviewer)} on ${escapeHtml(new Date(approval.approved_at).toLocaleString())}<br>Frozen objects: ${escapeHtml(snapshot.object_count ?? "—")} · observations: ${escapeHtml(snapshot.observation_count ?? "—")} · snapshot: <span class="mono">${escapeHtml(snapshot.manifest_sha256 || "—")}</span>`;
+}
+
+$("#reuse-corpus-button").addEventListener("click", () => {
+  const corpus = approvedCorpora.find(item => item.id === $("#approved-corpus-select").value && item.reusable);
+  if (!corpus) { toast("Choose a verified approved corpus"); return; }
+  clearTimeout(pollTimer);
+  $("#workspace").classList.add("hidden");
+  activateApprovedCorpus(corpus, true);
+  toast("Approved corpus reused — browser scrolling skipped");
+});
+
 $("#crawl-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("#start-button").disabled = true;
+  $("#pipeline-workspace").classList.add("hidden");
+  resetKnowledgeState();
   try {
     const run = await api("/api/runs", {method:"POST", body:JSON.stringify({
       url:$("#url").value, max_pages:Number($("#max-pages").value),
@@ -119,14 +188,14 @@ function renderQa(run) {
   node.className=`convergence ${report.verdict === "pass" ? "pass" : "fail"}`;
   node.innerHTML=`<strong>QA verdict: ${escapeHtml(report.verdict)}</strong><span>${report.probes.length} independent probe(s)</span>`;
   $("#qa-findings").innerHTML=(report.findings || []).map(f=>`<article class="finding ${escapeHtml(f.severity)}"><span class="badge">${escapeHtml(f.severity)}</span><strong>${escapeHtml(f.code)}</strong><p>${escapeHtml(f.message)}</p>${f.waivable ? '<p><em>This coverage gap may be accepted by the human reviewer with a recorded reason and residual risk.</em></p>' : ''}${(f.urls||[]).length ? `<details><summary>${f.urls.length} URL(s)</summary>${f.urls.map(u=>`<div class="mono wrap">${escapeHtml(u)}</div>`).join("")}</details>` : ""}</article>`).join("");
-  $("#exception-controls").innerHTML=(report.findings || []).filter(f=>f.waivable).map(f=>`<article class="exception-card" data-fingerprint="${escapeHtml(f.fingerprint)}"><label class="check"><input class="exception-accepted" type="checkbox" /> Accept ${escapeHtml(f.code)} for this corpus snapshot</label><label>Acceptance rationale<textarea class="exception-reason" placeholder="Why is this specific gap acceptable for the intended use?"></textarea></label><label>Residual risk<textarea class="exception-risk" placeholder="What can still be missing or wrong downstream?"></textarea></label></article>`).join("");
+  $("#exception-controls").innerHTML=(report.findings || []).filter(f=>f.waivable).map(f=>`<article class="exception-card" data-fingerprint="${escapeHtml(f.fingerprint)}"><label class="check"><input class="exception-accepted" type="checkbox" /> Accept ${escapeHtml(f.code)} for this corpus snapshot</label><label>Acceptance rationale<textarea class="exception-reason" minlength="20" placeholder="At least 20 characters: why is this specific gap acceptable?"></textarea></label><label>Residual risk<textarea class="exception-risk" minlength="10" placeholder="At least 10 characters: what can still be missing or wrong?"></textarea></label></article>`).join("");
 }
 
 function renderGate(run) {
   const gate = run.approval_gate; const state = $("#gate-state");
   const conditionallyReady = gate.eligible_with_exceptions;
   state.textContent = gate.eligible ? "Ready for review" : conditionallyReady ? "Exception review" : "Locked"; state.className = `status-pill ${gate.eligible || conditionallyReady ? "complete" : "locked"}`;
-  $("#blockers").innerHTML = gate.blockers.length ? `<strong>${conditionallyReady ? "Coverage gaps need your decision" : "Automatic blockers"}</strong><ul>${gate.blockers.map(item=>`<li>${escapeHtml(item)}</li>`).join("")}</ul>${conditionallyReady ? '<p>You may approve only after explicitly accepting each displayed QA gap. Integrity, tool and storage failures cannot be bypassed.</p>' : ''}` : "<strong>Automated checks passed.</strong> Complete your manual review below.";
+  $("#blockers").innerHTML = gate.blockers.length ? `<strong>${conditionallyReady ? "Coverage gaps need your decision" : "Automatic blockers"}</strong><ul>${gate.blockers.map(item=>`<li>${escapeHtml(item)}</li>`).join("")}</ul>${conditionallyReady ? '<p>You may approve only after explicitly accepting each displayed coverage gap. Corpus integrity, independent QA-tool and storage failures cannot be bypassed.</p>' : ''}` : "<strong>Automated checks passed.</strong> Complete your manual review below.";
   $("#approve-button").disabled = !(gate.eligible || conditionallyReady) || Boolean(run.approval);
 }
 
@@ -154,11 +223,11 @@ $("#approval-form").addEventListener("submit", async event => {
 });
 
 function renderApproval(approval) {
-  activeCorpusId=approval.id;
   const node=$("#approval-result"); node.classList.remove("hidden");
   node.innerHTML=`<strong>Approved corpus: ${escapeHtml(approval.id)}</strong><br>Reviewer: ${escapeHtml(approval.reviewer)} · Effective QA: ${escapeHtml(approval.qa_effective_verdict)} · Accepted gaps: ${(approval.accepted_qa_exceptions||[]).length}<br>Frozen objects: ${approval.corpus_snapshot.object_count} · Snapshot hash: <span class="mono">${approval.corpus_snapshot.manifest_sha256}</span>`;
   $("#approve-button").disabled=true;
-  $("#stage2-panel").classList.remove("hidden"); $("#stage2-button").disabled=false; $("#stage2-button").dataset.corpusId=approval.id;
+  activateApprovedCorpus(approval, false);
+  loadApprovedCorpora();
 }
 
 $("#stage2-button").addEventListener("click", async () => {
@@ -201,3 +270,4 @@ $("#compare-button").addEventListener("click", async () => {
 function escapeHtml(value) { const div=document.createElement("div"); div.textContent=String(value); return div.innerHTML; }
 
 loadRagRuntime();
+loadApprovedCorpora();

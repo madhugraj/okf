@@ -29,6 +29,18 @@ Open `http://127.0.0.1:8000`. The server binds to the local computer only; it is
 10. Complete all five human confirmations and enter the reviewer name.
 11. Approve the corpus. The system stores a manifest with the baseline run, stability run, QA verdict, reviewer, timestamp and SHA-256 of the approved report.
 
+## Reusing an approved website
+
+The UI lists prior approvals under **Reuse an approved website**. Selecting one verifies the
+immutable corpus-manifest hash and its approval metadata, then opens Stage 2, OKF and RAG without
+starting Playwright, repeating scroll actions, rerunning discovery or rerunning adversarial QA.
+Stage 2 continues to hash-check every referenced raw object before extracting it.
+
+This is an approved-snapshot replay for downstream testing, not evidence that the live website is
+unchanged. Use **Start a fresh controlled crawl** whenever the purpose is to detect new, removed or
+changed website content. A damaged or mismatched approval/snapshot pair is shown as unavailable and
+cannot be reused.
+
 ## Automatic approval blockers
 
 Approval remains locked when:

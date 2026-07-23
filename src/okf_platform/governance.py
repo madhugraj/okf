@@ -8,7 +8,13 @@ import json
 from typing import Iterable
 
 
-WAIVABLE_QA_CODES = frozenset({"QA_ONLY_URLS", "UNRESOLVED_BASELINE"})
+WAIVABLE_QA_CODES = frozenset(
+    {
+        "DISCOVERY_TOOL_FAILED",
+        "QA_ONLY_URLS",
+        "UNRESOLVED_BASELINE",
+    }
+)
 
 
 def finding_fingerprint(finding: dict[str, object]) -> str:

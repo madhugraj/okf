@@ -112,7 +112,10 @@ def _await_run(client: TestClient, run_id: str) -> dict[str, object]:
 
 def test_ui_serves_and_exposes_live_crawl_evidence(tmp_path) -> None:
     with TestClient(create_app(data_dir=tmp_path, runner=_runner, qa_runner=_qa_runner)) as client:
-        assert client.get("/").status_code == 200
+        page = client.get("/")
+        assert page.status_code == 200
+        assert "Reuse an approved website" in page.text
+        assert 'id="approved-corpus-select"' in page.text
         rag_config = client.get("/api/rag/config")
         assert rag_config.status_code == 200
         assert rag_config.json()["retrieval"]["sparse"] == "BM25"
@@ -169,6 +172,23 @@ def test_approval_requires_convergence_and_all_human_confirmations(tmp_path) -> 
         assert approval.json()["id"].startswith("corpus-")
         assert len(approval.json()["report_sha256"]) == 64
         assert approval.json()["corpus_snapshot"]["object_count"] == 2
+        approved_corpora = client.get("/api/corpora")
+        assert approved_corpora.status_code == 200
+        assert approved_corpora.json() == [
+            {
+                "id": approval.json()["id"],
+                "target_url": "https://example.com/",
+                "approved_at": approval.json()["approved_at"],
+                "reviewer": "Madhu",
+                "qa_effective_verdict": "pass",
+                "accepted_qa_exception_count": 0,
+                "source_run_id": second["id"],
+                "baseline_run_id": first["id"],
+                "corpus_snapshot": approval.json()["corpus_snapshot"],
+                "integrity": "verified",
+                "reusable": True,
+            }
+        ]
         extraction = client.post(
             f"/api/corpora/{approval.json()['id']}/stage2/extraction"
         )
@@ -185,6 +205,41 @@ def test_approval_requires_convergence_and_all_human_confirmations(tmp_path) -> 
                 "qa_findings_reviewed": True,
             },
         ).status_code == 409
+
+
+def test_damaged_approved_snapshot_is_visible_but_cannot_be_reused(tmp_path) -> None:
+    with TestClient(create_app(data_dir=tmp_path, runner=_runner, qa_runner=_qa_runner)) as client:
+        first = client.post("/api/runs", json={"url": "https://example.com/"}).json()
+        _await_run(client, first["id"])
+        second = client.post(f"/api/runs/{first['id']}/verification").json()
+        _await_run(client, second["id"])
+        client.post(f"/api/runs/{second['id']}/qa")
+        _await_qa(client, second["id"])
+        approval = client.post(
+            f"/api/runs/{second['id']}/approval",
+            json={
+                "reviewer": "Madhu",
+                "inventory_reviewed": True,
+                "exceptions_reviewed": True,
+                "robots_reviewed": True,
+                "archive_coverage_reviewed": True,
+                "qa_findings_reviewed": True,
+            },
+        ).json()
+
+        manifest = tmp_path / "corpora" / approval["id"] / "manifest.json"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(
+                "example.com", "tampered.example"
+            ),
+            encoding="utf-8",
+        )
+        listed = client.get("/api/corpora").json()
+
+        assert listed[0]["id"] == approval["id"]
+        assert listed[0]["integrity"] == "failed"
+        assert listed[0]["reusable"] is False
+        assert "integrity verification" in listed[0]["integrity_error"]
 
 
 def _await_qa(client: TestClient, run_id: str) -> dict[str, object]:
@@ -207,6 +262,26 @@ def _qa_gap_runner(config: RunConfig, report: CrawlReport) -> QaReport:
                 "Crawler has 1 invalid or unresolved outcome",
                 ("https://example.com/missing image.png",),
             )
+        ],
+    )
+
+
+def _qa_discovery_and_url_gap_runner(config: RunConfig, report: CrawlReport) -> QaReport:
+    return QaReport(
+        "fail",
+        [ProbeResult("independent-browser", frozenset(report.urls))],
+        [
+            QaFinding(
+                "DISCOVERY_TOOL_FAILED",
+                FindingSeverity.BLOCKER,
+                "Crawler evidence is incomplete because a rendered discovery tool failed",
+            ),
+            QaFinding(
+                "UNRESOLVED_BASELINE",
+                FindingSeverity.BLOCKER,
+                "Crawler has 1 invalid or unresolved outcome",
+                ("https://example.com/decorative image.png",),
+            ),
         ],
     )
 
@@ -281,3 +356,56 @@ def test_reviewer_can_accept_a_coverage_gap_with_audited_exception(tmp_path) -> 
         assert approval.status_code == 200
         assert approval.json()["qa_effective_verdict"] == "accepted_with_exceptions"
         assert approval.json()["accepted_qa_exceptions"][0]["accepted_by"] == "Madhu"
+
+
+def test_reviewer_can_accept_discovery_failure_and_unresolved_assets_together(
+    tmp_path,
+) -> None:
+    with TestClient(
+        create_app(
+            data_dir=tmp_path,
+            runner=_runner,
+            qa_runner=_qa_discovery_and_url_gap_runner,
+        )
+    ) as client:
+        first = client.post("/api/runs", json={"url": "https://example.com/"}).json()
+        _await_run(client, first["id"])
+        second = client.post(f"/api/runs/{first['id']}/verification").json()
+        _await_run(client, second["id"])
+        client.post(f"/api/runs/{second['id']}/qa")
+        run = _await_qa(client, second["id"])
+
+        assert run["approval_gate"]["eligible_with_exceptions"]
+        findings = run["qa"]["report"]["findings"]
+        assert {finding["code"] for finding in findings} == {
+            "DISCOVERY_TOOL_FAILED",
+            "UNRESOLVED_BASELINE",
+        }
+        assert all(finding["waivable"] for finding in findings)
+
+        payload = {
+            "reviewer": "Madhu",
+            "inventory_reviewed": True,
+            "exceptions_reviewed": True,
+            "robots_reviewed": True,
+            "archive_coverage_reviewed": True,
+            "qa_findings_reviewed": True,
+            "qa_exceptions": [
+                {
+                    "finding_fingerprint": finding["fingerprint"],
+                    "accepted": True,
+                    "reason": (
+                        "The remaining evidence is adequate for this bounded knowledge corpus."
+                    ),
+                    "residual_risk": (
+                        "Rendered-only links or decorative assets may remain undiscovered."
+                    ),
+                }
+                for finding in findings
+            ],
+        }
+        approval = client.post(f"/api/runs/{second['id']}/approval", json=payload)
+
+        assert approval.status_code == 200
+        assert approval.json()["qa_effective_verdict"] == "accepted_with_exceptions"
+        assert len(approval.json()["accepted_qa_exceptions"]) == 2

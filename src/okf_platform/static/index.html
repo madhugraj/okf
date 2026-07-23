@@ -19,7 +19,7 @@
     <main>
       <section class="panel setup-panel">
         <div class="section-heading">
-          <div><p class="step">01 · DISCOVER</p><h2>Start a controlled crawl</h2></div>
+          <div><p class="step">01 · DISCOVER</p><h2>Start a fresh controlled crawl</h2></div>
           <p>HTTP/sitemap discovery plus Playwright-rendered discovery. Robots rules are enforced.</p>
         </div>
         <form id="crawl-form" class="crawl-form">
@@ -29,6 +29,19 @@
           <label>Retries<input id="max-attempts" type="number" value="3" min="1" /></label>
           <button id="start-button" class="primary" type="submit">Start crawl</button>
         </form>
+      </section>
+
+      <section class="panel reuse-panel">
+        <div class="section-heading">
+          <div><p class="step">FAST PATH · APPROVED SNAPSHOT</p><h2>Reuse an approved website</h2></div>
+          <span id="approved-cache-pill" class="status-pill">Loading</span>
+        </div>
+        <p class="help">Continue from a previously approved corpus whose immutable manifest has been verified, without opening Playwright or scrolling the website again. Start a fresh crawl above only when you need to detect website changes.</p>
+        <div class="reuse-controls">
+          <label>Approved corpus<select id="approved-corpus-select" disabled><option value="">Loading approved corpora…</option></select></label>
+          <button id="reuse-corpus-button" class="primary" type="button" disabled>Reuse approved corpus</button>
+        </div>
+        <div id="approved-cache-status" class="cache-status">Reading immutable approval manifests…</div>
       </section>
 
       <section class="panel runtime-panel">
@@ -102,7 +115,16 @@
           </form>
           <div id="approval-result" class="approval-result hidden"></div>
         </section>
+      </section>
 
+      <section id="pipeline-workspace" class="workspace hidden">
+        <section class="panel corpus-source-panel">
+          <div class="section-heading">
+            <div><p class="step">APPROVED INPUT</p><h2 id="pipeline-corpus-title">Verified corpus snapshot</h2></div>
+            <span id="pipeline-corpus-pill" class="status-pill complete">Manifest verified</span>
+          </div>
+          <div id="pipeline-corpus-details" class="cache-status"></div>
+        </section>
         <section id="stage2-panel" class="panel hidden">
           <div class="section-heading">
             <div><p class="step">STAGE 2 · NORMALIZE</p><h2>Extract typed, source-linked text</h2></div>

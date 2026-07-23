@@ -20,10 +20,11 @@ report as its source of truth and never changes raw corpus bytes.
 
 ## Human QA exceptions
 
-A reviewer may accept `QA_ONLY_URLS` or `UNRESOLVED_BASELINE` findings when the gap does not prevent
-the intended use. The exception is bound to the exact critic finding and stores reviewer, timestamp,
-rationale, affected URLs and residual risk. Discovery-tool failure, QA-tool failure, missing corpus
-bytes, empty corpus, exhausted budget, incomplete processing and failed stability remain hard gates.
+A reviewer may accept `DISCOVERY_TOOL_FAILED`, `QA_ONLY_URLS` or `UNRESOLVED_BASELINE` findings
+when the gap does not prevent the intended use. The exception is bound to the exact critic finding
+and stores reviewer, timestamp, rationale, affected URLs and residual risk. Independent QA-tool
+failure, missing corpus bytes, empty corpus, exhausted budget, incomplete processing and failed
+stability remain hard gates.
 
 An accepted exception changes the effective verdict to `accepted_with_exceptions`; it never rewrites
 the original QA verdict.
